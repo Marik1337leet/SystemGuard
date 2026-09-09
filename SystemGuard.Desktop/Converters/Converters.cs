@@ -125,7 +125,15 @@ public class TabBrushConverter : IMultiValueConverter
     }
 }
 
-// ── string HEX → Avalonia Color (для SvSquareHueColor биндинга) ──────────────
+// ── string → bool (непустая строка) ─────────────────────────────────────────
+public class StringNotEmptyConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => !string.IsNullOrWhiteSpace(value as string);
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
 public class HexToColorConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)

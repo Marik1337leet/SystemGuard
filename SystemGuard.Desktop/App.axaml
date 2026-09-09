@@ -16,6 +16,7 @@
         <converters:ActionToColorConverter     x:Key="ActionToColorConverter"/>
         <converters:TabBrushConverter          x:Key="TabBrushConverter"/>
         <converters:HexToColorConverter        x:Key="HexToColorConverter"/>
+        <converters:StringNotEmptyConverter    x:Key="StringNotEmptyConverter"/>
 
         <!-- Цвета по умолчанию -->
         <Color x:Key="BgColor">#050508</Color>

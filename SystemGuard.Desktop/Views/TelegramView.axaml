@@ -128,6 +128,16 @@
                     </Grid>
                     <TextBlock Text="{Binding LiveStatus}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
                                TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding TunnelLog}" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"
+                               TextWrapping="Wrap" FontFamily="Consolas"
+                               IsVisible="{Binding TunnelLog, Converter={StaticResource StringNotEmptyConverter}}"/>
+                    <Grid ColumnDefinitions="Auto,*">
+                        <TextBlock Text="Same Wi-Fi / this PC:" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox Grid.Column="1" Text="{Binding LanUrl, Mode=OneWay}" IsReadOnly="True"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                 Foreground="{DynamicResource TextBrush}" Padding="16,11" FontFamily="Consolas" FontSize="11"/>
+                    </Grid>
                     <Grid ColumnDefinitions="*,*" IsVisible="{Binding IsLiveRunning}">
                         <TextBox Text="{Binding LiveUrl, Mode=OneWay}" IsReadOnly="True"
                                  Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"

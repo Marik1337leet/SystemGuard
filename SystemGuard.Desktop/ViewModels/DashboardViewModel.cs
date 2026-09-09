@@ -166,18 +166,22 @@ public partial class DashboardViewModel : ViewModelBase
         var netUp = Math.Round(info.NetworkUpload / 125_000.0, 2);
         var tick = (int)_tick;
 
-        // История и алерты — дешёвые, но всё равно вне UI-потока
+        // История и алерты — дешёвые, но всё равно вне UI-потока.
+        // Свободное место берём из DriveInfo (реальные диски), а НЕ из сенсоров
+        // LibreHardwareMonitor: там бывают дубли/не те единицы — и прилетали
+        // ложные "Low disk space", хотя на диске сотни ГБ свободны.
+        var diskFreeGb = AlertService.MinDiskFreeGb();
         _history.Record(new MonitoringSample
         {
             CpuLoad = cpuLoad, CpuTemp = cpuTemp, RamPercent = memPct,
             NetDownMbps = netDown, NetUpMbps = netUp,
-            DiskFreeGb = info.Drives.Count > 0 ? info.Drives.Min(d => d.TotalSpace - d.UsedSpace) : -1
+            DiskFreeGb = diskFreeGb
         });
         if (tick % 60 == 0) _ = Task.Run(() => { try { _history.Save(); } catch { } });
         if (tick % 5 == 0)
         {
-            var minFree = info.Drives.Count > 0 ? info.Drives.Min(d => d.TotalSpace - d.UsedSpace) : -1;
-            _ = Task.Run(() => { try { _alerts.CheckNow(cpuTemp, minFree, networkUp: true); } catch { } });
+            var df = diskFreeGb;
+            _ = Task.Run(() => { try { _alerts.CheckNow(cpuTemp, df, networkUp: true); } catch { } });
         }
 
         if (tick % 5 == 0)
@@ -186,9 +190,7 @@ public partial class DashboardViewModel : ViewModelBase
             {
                 try
                 {
-                    var up = TimeSpan.FromMilliseconds(Environment.TickCount64);
-                    var ut = up.TotalDays >= 1 ? $"{(int)up.TotalDays}d {up.Hours}h"
-                        : up.TotalHours >= 1 ? $"{(int)up.TotalHours}h {up.Minutes}m" : $"{up.Minutes}m";
+                    var ut = SystemUptime.UptimeText;
                     var pc = System.Diagnostics.Process.GetProcesses().Length;
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     {
@@ -209,11 +211,7 @@ public partial class DashboardViewModel : ViewModelBase
                     if (!AlertService.IsNetworkUp())
                         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                         {
-                            try
-                            {
-                                var mf = Drives.Count > 0 ? Drives.Min(d => d.TotalSpace - d.UsedSpace) : -1;
-                                _alerts.CheckNow(cpuTemp, mf, networkUp: false);
-                            }
+                            try { _alerts.CheckNow(cpuTemp, AlertService.MinDiskFreeGb(), networkUp: false); }
                             catch { }
                         });
                 }

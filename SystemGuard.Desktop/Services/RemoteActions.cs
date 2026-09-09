@@ -24,9 +24,7 @@ public static class RemoteActions
         {
             var (totalGb, availGb) = DetailedSystemInfoService.GetPhysicalMemory();
             var usedGb = Math.Max(0, totalGb - availGb);
-            var up = TimeSpan.FromMilliseconds(Environment.TickCount64);
-            var upStr = up.TotalDays >= 1 ? $"{(int)up.TotalDays}d {up.Hours}h"
-                : up.TotalHours >= 1 ? $"{(int)up.TotalHours}h {up.Minutes}m" : $"{up.Minutes}m";
+            var upStr = SystemUptime.UptimeText;
             string batt;
             try
             {
@@ -105,7 +103,10 @@ public static class RemoteActions
                     }
                     return Fail("Use 0-100, up, down, mute");
                 }
-                case "mute": await Task.Run(() => VolumeService.MuteToggle()).ConfigureAwait(false); return Ok("Muted");
+                case "mute":
+                    await Task.Run(() => VolumeService.MuteToggle()).ConfigureAwait(false);
+                    await Task.Delay(150).ConfigureAwait(false);
+                    return Ok(VolumeService.IsMuted() ? "Sound muted" : $"Sound on ({VolumeService.GetPercent()}%)");
                 case "brightness":
                 {
                     var digits = new string(arg.Where(char.IsDigit).ToArray());
@@ -142,7 +143,7 @@ public static class RemoteActions
                     var ext = await new NetworkService().GetPublicIpAsync().ConfigureAwait(false);
                     return Ok($"External: {ext}");
                 case "ping": return Ok($"Ping 8.8.8.8: {await new NetworkService().TestLatency().ConfigureAwait(false)} ms");
-                case "uptime": return Ok($"Uptime: {TimeSpan.FromMilliseconds(Environment.TickCount64):d\\d\\ h\\h\\ m\\m}");
+                case "uptime": return Ok("Uptime: " + SystemUptime.UptimeText);
                 case "apps": return Ok(await RunningAppsAsync().ConfigureAwait(false));
                 case "screenshot": case "cam": case "stream": case "stop":
                     return Ok("Photo/stream arrives in the bot chat");

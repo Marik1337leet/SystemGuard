@@ -366,7 +366,10 @@ public sealed class TelegramBotService : IDisposable
             case "/cam": await SendWebcamToChat(cid).ConfigureAwait(false); break;
             case "/mute":
                 await Task.Run(() => VolumeService.MuteToggle()).ConfigureAwait(false);
-                await SendHtml(cid, $"Muted. Volume: <b>{VolumeService.GetPercent()}%</b>").ConfigureAwait(false);
+                await Task.Delay(150).ConfigureAwait(false);
+                await SendHtml(cid, VolumeService.IsMuted()
+                    ? "Sound <b>muted</b>."
+                    : $"Sound on. Volume: <b>{VolumeService.GetPercent()}%</b>").ConfigureAwait(false);
                 break;
 
             case "/ls":
@@ -457,7 +460,7 @@ public sealed class TelegramBotService : IDisposable
                 await SendHtml(cid, $"Ping 8.8.8.8: <b>{await new NetworkService().TestLatency().ConfigureAwait(false)} ms</b>").ConfigureAwait(false);
                 break;
             case "/uptime":
-                await SendHtml(cid, $"<b>Uptime:</b> {Esc($"{TimeSpan.FromMilliseconds(Environment.TickCount64):d\\d\\ h\\h\\ m\\m}")}").ConfigureAwait(false);
+                await SendHtml(cid, "<b>Uptime:</b> " + Esc(SystemUptime.UptimeText)).ConfigureAwait(false);
                 break;
             case "/battery": await SendHtml(cid, Esc(GetBatteryLine())).ConfigureAwait(false); break;
             case "/free": await SendHtml(cid, Esc(GetFreeSpace())).ConfigureAwait(false); break;
@@ -556,9 +559,7 @@ public sealed class TelegramBotService : IDisposable
             }
             catch { drives = "  • —"; }
 
-            var up = TimeSpan.FromMilliseconds(Environment.TickCount64);
-            var upStr = up.TotalDays >= 1 ? $"{(int)up.TotalDays}d {up.Hours}h {up.Minutes}m"
-                : up.TotalHours >= 1 ? $"{(int)up.TotalHours}h {up.Minutes}m" : $"{up.Minutes}m";
+            var upStr = SystemUptime.UptimeText;
 
             card = $"<b>{Esc(Environment.MachineName)}</b> — <i>online</i>\n" +
                    $"<code>{Esc(Environment.OSVersion.VersionString)}</code> • {Environment.ProcessorCount} cores\n" +
@@ -645,7 +646,10 @@ public sealed class TelegramBotService : IDisposable
         if (a is "mute")
         {
             await Task.Run(() => VolumeService.MuteToggle()).ConfigureAwait(false);
-            await SendHtml(cid, $"Muted. Volume: <b>{VolumeService.GetPercent()}%</b>").ConfigureAwait(false);
+            await Task.Delay(150).ConfigureAwait(false);
+            await SendHtml(cid, VolumeService.IsMuted()
+                ? "Sound <b>muted</b>."
+                : $"Sound on. Volume: <b>{VolumeService.GetPercent()}%</b>").ConfigureAwait(false);
             return;
         }
         if (a is "up" or "+10" or "+")
@@ -1000,6 +1004,8 @@ public sealed class TelegramBotService : IDisposable
         catch (Exception ex) { return $"Error: {Trim(ex.Message.Split('\n')[0], 200)}"; }
     }
 
+    // На ПК сохраняется ВСЁ: документы, фото (лучшее качество), видео,
+    // кружки, аудио и голосовые — раньше фото молча игнорировались.
     private async Task HandleFileUpload(Message msg)
     {
         var c = msg.Chat.Id;
@@ -1007,17 +1013,58 @@ public sealed class TelegramBotService : IDisposable
         {
             var dp = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "TG Downloads");
             Directory.CreateDirectory(dp);
+
+            string? fileId = null;
+            string fileName = "";
             if (msg.Document != null)
             {
-                await SendHtml(c, "<i>Downloading…</i>").ConfigureAwait(false);
-                var f = await _botClient!.GetFileAsync(msg.Document.FileId).ConfigureAwait(false);
-                var safe = string.Concat((msg.Document.FileName ?? "file").Split(Path.GetInvalidFileNameChars()));
-                var p = Path.Combine(dp, string.IsNullOrWhiteSpace(safe) ? "file" : safe);
-                var bytes = await _http.GetByteArrayAsync($"https://api.telegram.org/file/bot{_token}/{f.FilePath}").ConfigureAwait(false);
-                await File.WriteAllBytesAsync(p, bytes).ConfigureAwait(false);
-                await SendHtml(c, $"Saved to PC:\n<code>{Esc(p)}</code>").ConfigureAwait(false);
+                fileId = msg.Document.FileId;
+                fileName = msg.Document.FileName ?? "file";
             }
-            else await SendHtml(c, "Photo received — send as <b>file/document</b> to save it on PC.").ConfigureAwait(false);
+            else if (msg.Photo != null && msg.Photo.Length > 0)
+            {
+                var best = msg.Photo.OrderByDescending(p => p.Width * p.Height).First();
+                fileId = best.FileId;
+                fileName = $"photo_{DateTime.Now:yyyyMMdd_HHmmss}.jpg";
+            }
+            else if (msg.Video != null)
+            {
+                fileId = msg.Video.FileId;
+                fileName = msg.Video.FileName ?? $"video_{DateTime.Now:yyyyMMdd_HHmmss}.mp4";
+            }
+            else if (msg.VideoNote != null)
+            {
+                fileId = msg.VideoNote.FileId;
+                fileName = $"videonote_{DateTime.Now:yyyyMMdd_HHmmss}.mp4";
+            }
+            else if (msg.Audio != null)
+            {
+                fileId = msg.Audio.FileId;
+                fileName = msg.Audio.FileName ?? $"audio_{DateTime.Now:yyyyMMdd_HHmmss}.mp3";
+            }
+            else if (msg.Voice != null)
+            {
+                fileId = msg.Voice.FileId;
+                fileName = $"voice_{DateTime.Now:yyyyMMdd_HHmmss}.ogg";
+            }
+
+            if (fileId == null)
+            {
+                await SendHtml(c, "Nothing to save: send a file, photo, video or audio.").ConfigureAwait(false);
+                return;
+            }
+
+            await SendHtml(c, "<i>Downloading…</i>").ConfigureAwait(false);
+            var f = await _botClient!.GetFileAsync(fileId).ConfigureAwait(false);
+            var safe = string.Concat(fileName.Split(Path.GetInvalidFileNameChars()));
+            if (string.IsNullOrWhiteSpace(safe)) safe = "file";
+            var p = Path.Combine(dp, safe);
+            if (File.Exists(p))
+                p = Path.Combine(dp, Path.GetFileNameWithoutExtension(safe) +
+                    $"_{DateTime.Now:HHmmss}" + Path.GetExtension(safe));
+            var bytes = await _http.GetByteArrayAsync($"https://api.telegram.org/file/bot{_token}/{f.FilePath}").ConfigureAwait(false);
+            await File.WriteAllBytesAsync(p, bytes).ConfigureAwait(false);
+            await SendHtml(c, $"Saved to PC ({bytes.Length / 1024} KB):\n<code>{Esc(p)}</code>").ConfigureAwait(false);
         }
         catch (Exception ex) { await SendHtml(c, $"Upload error: <code>{Esc(Trim(ex.Message, 200))}</code>").ConfigureAwait(false); }
     }

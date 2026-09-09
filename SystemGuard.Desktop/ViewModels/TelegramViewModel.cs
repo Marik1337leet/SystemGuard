@@ -28,6 +28,8 @@ public partial class TelegramViewModel : ViewModelBase
     [ObservableProperty] private string _liveStatus = "Live access is off";
     [ObservableProperty] private string _liveUrl = "";
     [ObservableProperty] private string _liveToken = "";
+    [ObservableProperty] private string _lanUrl = "";
+    [ObservableProperty] private string _tunnelLog = "";
     [ObservableProperty] private bool _isLiveRunning;
     [ObservableProperty] private bool _isLiveBusy;
 
@@ -229,11 +231,15 @@ public partial class TelegramViewModel : ViewModelBase
     private void RefreshLiveState()
     {
         var t = LiveServices.Tunnel;
+        var lan = "";
+        try { lan = $"http://{TunnelService.GetLanIPv4()}:{RemoteHttpServer.Port}"; } catch { }
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             IsLiveRunning = t.IsRunning;
             LiveUrl = t.PublicUrl ?? "";
             LiveToken = LiveServices.Token;
+            LanUrl = lan;
+            TunnelLog = t.LastLog ?? "";
             LiveStatus = t.IsRunning
                 ? "Live: " + (t.PublicUrl ?? "")
                 : t.Status == "Stopped" ? "Live access is off" : t.Status;

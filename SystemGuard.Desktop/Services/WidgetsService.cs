@@ -37,6 +37,7 @@ public class WidgetsService
 
     private static System.Diagnostics.PerformanceCounter? _cpuCounter;
     private static System.Diagnostics.PerformanceCounter? _ramCounter;
+    private static bool _cpuPrimed;
 
     public WidgetsService()
     {
@@ -79,9 +80,22 @@ public class WidgetsService
         {
             _cpuCounter ??= new System.Diagnostics.PerformanceCounter("Processor", "% Processor Time", "_Total");
             _ramCounter ??= new System.Diagnostics.PerformanceCounter("Memory", "Available MBytes");
-            // Первый замер всегда 0 — прогреваем один раз
-            _ = _cpuCounter.NextValue();
-            double cpu = Math.Round(_cpuCounter.NextValue(), 1);
+            double cpu;
+            if (!_cpuPrimed)
+            {
+                // Первый вызов только открывает окно замера и возвращает 0 —
+                // раньше здесь делались ДВА замера подряд, и второй (мгновенный)
+                // всегда показывал мусор вместо реальной нагрузки.
+                _ = _cpuCounter.NextValue();
+                _cpuPrimed = true;
+                cpu = 0;
+            }
+            else
+            {
+                // Один замер за вызов: значение = средняя нагрузка
+                // со прошлого вызова (виджет обновляется раз в ~30с — точно).
+                cpu = Math.Round(Math.Clamp(_cpuCounter.NextValue(), 0, 100), 1);
+            }
             double availMb = _ramCounter.NextValue();
             // Total — физическая RAM (GlobalMemoryStatusEx), НЕ GC-метрика с pagefile
             double totalGb = DetailedSystemInfoService.GetTotalPhysicalGb();
