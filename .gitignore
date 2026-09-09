@@ -1,0 +1,30 @@
+## Build
+bin/
+obj/
+out/
+publish/
+
+## Visual Studio / Rider
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+TestResults/
+
+## .NET
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+## SystemGuard runtime data (local only, never commit)
+*.log
+telegram.json
+settings.json

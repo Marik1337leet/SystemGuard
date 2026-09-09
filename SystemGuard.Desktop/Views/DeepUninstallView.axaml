@@ -1,0 +1,452 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:services="using:SystemGuard.Desktop.Services"
+             x:Class="SystemGuard.Desktop.Views.DeepUninstallView"
+             x:DataType="vm:DeepUninstallViewModel">
+
+    <UserControl.Styles>
+        <!-- Пилюли -->
+        <Style Selector="Button.pill">
+            <Setter Property="Padding" Value="20,12"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.pillPrimary">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BgBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.pillGlass">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Button.pillGhost">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Button.pill:pointerover">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style Selector="Button.pill:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+
+        <!-- ═══ Step-карточки 1→2→3: стекло + анимации ═══ -->
+        <Style Selector="Button.stepCard">
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="Padding" Value="12,14"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="RenderTransform" Value="scale(1)"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.22"/>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.22"/>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.22"/>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.22" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.stepGlass">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#1FFFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Button.stepGlass:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Opacity" Value="0.92"/>
+        </Style>
+        <Style Selector="Button.stepAccent">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+        </Style>
+        <Style Selector="Button.stepAccent:pointerover">
+            <Setter Property="Background" Value="#1EFFFFFF"/>
+            <Setter Property="Opacity" Value="0.94"/>
+        </Style>
+        <Style Selector="Button.stepHero">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.stepHero:pointerover">
+            <Setter Property="Opacity" Value="0.9"/>
+        </Style>
+        <Style Selector="Button.stepCard:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.96)"/>
+            <Setter Property="Opacity" Value="0.8"/>
+        </Style>
+        <Style Selector="Button.stepCard:disabled">
+            <Setter Property="Opacity" Value="0.45"/>
+        </Style>
+
+        <Style Selector="Border.rowGlass:pointerover">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="380,*" Margin="28,22,28,22">
+
+        <!-- ═══ LEFT — Program List ══════════════════════════════════════════ -->
+        <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*" Margin="0,0,10,0">
+
+            <!-- Header -->
+            <Border Grid.Row="0" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    CornerRadius="24" Padding="18" Margin="0,0,0,10"
+                    BoxShadow="0 8 24 -8 #4D000000">
+                <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Installed programs" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                        <Button Grid.Column="1" Classes="pill pillPrimary"
+                                Padding="14,8" FontSize="11"
+                                Command="{Binding LoadProgramsCommand}"
+                                IsEnabled="{Binding !IsScanning}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Path Data="M17.65 6.35A7.96 7.96 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L12 12h8V4l-2.35 2.35z"
+                                      Fill="{DynamicResource BgBrush}" Width="11" Height="11" Stretch="Uniform"/>
+                                <TextBlock Text="Refresh"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <TextBox Text="{Binding SearchText}"
+                             Watermark="Search programs..."
+                             Background="#14FFFFFF"
+                             BorderThickness="0"
+                             CornerRadius="18" Foreground="{DynamicResource TextBrush}"
+                             Padding="16,10"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Stats -->
+            <Border Grid.Row="1" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    CornerRadius="18" Padding="14,10" Margin="0,0,0,10">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding StatusText}" FontSize="10"
+                               Foreground="{DynamicResource TextMutedBrush}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding FilteredPrograms.Count, StringFormat='{}{0} programs'}"
+                               FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
+                               VerticalAlignment="Center" Margin="12,0,0,0"/>
+                </Grid>
+            </Border>
+
+            <!-- Program list -->
+            <Border Grid.Row="2" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    CornerRadius="24" Padding="6"
+                    BoxShadow="0 8 24 -8 #4D000000">
+                <ListBox ItemsSource="{Binding FilteredPrograms}"
+                         SelectedItem="{Binding SelectedProgram}"
+                         Background="Transparent" BorderThickness="0" Padding="4">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="services:InstalledProgram">
+                            <Border Padding="12,10" Classes="rowGlass" CornerRadius="8"
+                                    BorderBrush="#14FFFFFF"
+                                    BorderThickness="0,0,0,1">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Spacing="3" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}"
+                                                   Foreground="{DynamicResource TextBrush}"
+                                                   FontSize="12" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{Binding Publisher}"
+                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                       FontSize="9" TextTrimming="CharacterEllipsis" MaxWidth="180" MaxLines="1"/>
+                                            <TextBlock Text="{Binding Version}"
+                                                       Foreground="{DynamicResource AccentLightBrush}"
+                                                       FontSize="9" MaxLines="1"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0"
+                                               Text="{Binding EstimatedSizeMb, StringFormat='{}{0} MB'}"
+                                               Foreground="{DynamicResource TextMutedBrush}"
+                                               FontSize="10"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+        </Grid>
+
+        <!-- ═══ RIGHT — Uninstall Panel ══════════════════════════════════════ -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,*,Auto">
+
+            <!-- Selected program hero + STEPS -->
+            <Panel Grid.Row="0" Margin="0,0,0,10">
+                <Border CornerRadius="26" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 10 30 -8 #59000000" Padding="22">
+                    <StackPanel Spacing="14">
+                        <!-- No selection placeholder -->
+                        <TextBlock Text="Select a program on the left to uninstall"
+                                   FontSize="13" Foreground="{DynamicResource TextMutedBrush}"
+                                   HorizontalAlignment="Center" Margin="0,8"
+                                   IsVisible="{Binding SelectedProgram,
+                                       Converter={x:Static ObjectConverters.IsNull}}"/>
+
+                        <!-- Program details -->
+                        <StackPanel Spacing="4" IsVisible="{Binding SelectedProgram,
+                                        Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <TextBlock Text="{Binding SelectedProgram.Name}"
+                                       FontSize="22" FontWeight="Bold"
+                                       Foreground="{DynamicResource TextBrush}"
+                                       TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="{Binding SelectedProgram.Publisher}"
+                                           FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                           TextTrimming="CharacterEllipsis" MaxWidth="220" MaxLines="1"/>
+                                <TextBlock Text="{Binding SelectedProgram.Version}"
+                                           FontSize="10" Foreground="{DynamicResource AccentLightBrush}" MaxLines="1"/>
+                                <TextBlock Text="{Binding SelectedProgram.EstimatedSizeMb, StringFormat='{}{0} MB'}"
+                                           FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" MaxLines="1"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding SelectedProgram.InstallLocation}"
+                                   FontSize="9" FontFamily="Consolas" Foreground="{DynamicResource TextMutedBrush}"
+                                   TextTrimming="CharacterEllipsis" MaxLines="1"
+                                   IsVisible="{Binding SelectedProgram.InstallLocation,
+                                       Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        <Button Classes="pill pillGhost" Content="Open install folder"
+                                HorizontalAlignment="Left" Padding="14,7" FontSize="10"
+                                Command="{Binding OpenLocationCommand}"
+                                IsVisible="{Binding SelectedProgram,
+                                    Converter={x:Static ObjectConverters.IsNotNull}}"/>
+
+                        <!-- Stage dots: 1 → 2 → 3 -->
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center"
+                                    IsVisible="{Binding SelectedProgram,
+                                        Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <Border Width="8" Height="8" CornerRadius="4" Background="{DynamicResource AccentBrush}"/>
+                            <Rectangle Width="24" Height="1" Fill="#1FFFFFFF"/>
+                            <Border Width="8" Height="8" CornerRadius="4"
+                                    Background="{Binding HasTraces, Converter={StaticResource BoolToAccentBrushConverter}}"/>
+                            <Rectangle Width="24" Height="1" Fill="#1FFFFFFF"/>
+                            <Border Width="8" Height="8" CornerRadius="4"
+                                    Background="{Binding ShowUninstallResult, Converter={StaticResource BoolToAccentBrushConverter}}"/>
+                        </StackPanel>
+
+                        <!-- ═══ Action steps ═══ -->
+                        <Grid ColumnDefinitions="*,*,*" IsVisible="{Binding SelectedProgram,
+                                        Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <!-- Step 1: Standard uninstaller -->
+                            <Button Grid.Column="0" Classes="stepCard stepGlass" Margin="0,0,5,0"
+                                    Command="{Binding RunStandardUninstallerCommand}"
+                                    IsEnabled="{Binding !IsUninstalling}">
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border CornerRadius="9" Padding="8,3" Background="#0AFFFFFF" HorizontalAlignment="Center">
+                                        <TextBlock Text="STEP 1" FontSize="8" FontWeight="Bold"
+                                                   Foreground="{DynamicResource TextMutedBrush}"/>
+                                    </Border>
+                                    <Path Data="M8 5v14l11-7z"
+                                          Fill="{DynamicResource TextBrush}" Width="20" Height="20" Stretch="Uniform"
+                                          HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Standard" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextBrush}"
+                                               HorizontalAlignment="Center" MaxLines="1"/>
+                                    <TextBlock Text="Run uninstaller" FontSize="9"
+                                               Foreground="{DynamicResource TextMutedBrush}"
+                                               HorizontalAlignment="Center" MaxLines="1"
+                                               TextTrimming="CharacterEllipsis" MaxWidth="120"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Step 2: Scan traces (hero-action) -->
+                            <Button Grid.Column="1" Classes="stepCard stepAccent" Margin="5,0"
+                                    Command="{Binding ScanTracesCommand}"
+                                    IsEnabled="{Binding !IsScanning}">
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border CornerRadius="9" Padding="8,3" Background="{DynamicResource AccentBrush}" HorizontalAlignment="Center">
+                                        <TextBlock Text="STEP 2" FontSize="8" FontWeight="Bold"
+                                                   Foreground="{DynamicResource BgBrush}"/>
+                                    </Border>
+                                    <Path Data="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"
+                                          Fill="{DynamicResource AccentBrush}" Width="20" Height="20" Stretch="Uniform"
+                                          HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Scan" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AccentBrush}"
+                                               HorizontalAlignment="Center" MaxLines="1"
+                                               IsVisible="{Binding !IsScanning}"/>
+                                    <TextBlock Text="Scanning…" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AccentBrush}"
+                                               HorizontalAlignment="Center" MaxLines="1"
+                                               IsVisible="{Binding IsScanning}"/>
+                                    <TextBlock Text="Find all traces" FontSize="9"
+                                               Foreground="{DynamicResource TextMutedBrush}"
+                                               HorizontalAlignment="Center" MaxLines="1"
+                                               TextTrimming="CharacterEllipsis" MaxWidth="120"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Step 3: Deep remove (hero fill) -->
+                            <Button Grid.Column="2" Classes="stepCard stepHero" Margin="5,0,0,0"
+                                    Command="{Binding DeepRemoveCommand}"
+                                    IsEnabled="{Binding !IsUninstalling}">
+                                <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                    <Border CornerRadius="9" Padding="8,3" Background="#33000000" HorizontalAlignment="Center">
+                                        <TextBlock Text="STEP 3" FontSize="8" FontWeight="Bold"
+                                                   Foreground="{DynamicResource BgBrush}"/>
+                                    </Border>
+                                    <Path Data="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+                                          Fill="{DynamicResource BgBrush}" Width="20" Height="20" Stretch="Uniform"
+                                          HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Deep" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource BgBrush}"
+                                               HorizontalAlignment="Center" MaxLines="1"/>
+                                    <TextBlock Text="Remove traces" FontSize="9"
+                                               Foreground="{DynamicResource BgBrush}" Opacity="0.75"
+                                               HorizontalAlignment="Center" MaxLines="1"
+                                               TextTrimming="CharacterEllipsis" MaxWidth="120"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <Border CornerRadius="26" IsHitTestVisible="False">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,55%">
+                            <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                            <GradientStop Color="#00FFFFFF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Panel>
+
+            <!-- Progress -->
+            <Border Grid.Row="1" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    CornerRadius="18" Padding="16,12" Margin="0,0,0,10"
+                    IsVisible="{Binding IsScanning}">
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding StatusText}" FontSize="11"
+                                   Foreground="{DynamicResource TextBrush}"
+                                   TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                        <Button Grid.Column="1" Classes="pill pillGhost" Content="Cancel"
+                                Padding="14,6" FontSize="10"
+                                Command="{Binding CancelCommand}" Margin="12,0,0,0"/>
+                    </Grid>
+                    <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100"
+                                 Height="4" CornerRadius="2"
+                                 Foreground="{DynamicResource AccentBrush}"
+                                 Background="#14FFFFFF"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Result message -->
+            <Border Grid.Row="2" CornerRadius="18" Padding="16,12" Margin="0,0,0,10"
+                    Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    IsVisible="{Binding ShowUninstallResult}">
+                <TextBlock Text="{Binding UninstallResultText}"
+                           Foreground="{Binding UninstallResultColor}"
+                           FontSize="11" TextWrapping="Wrap" MaxLines="6"
+                           TextTrimming="CharacterEllipsis"/>
+            </Border>
+
+            <!-- Traces list -->
+            <Border Grid.Row="3" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    CornerRadius="24" Padding="6"
+                    BoxShadow="0 8 24 -8 #4D000000"
+                    IsVisible="{Binding HasTraces}">
+                <Grid RowDefinitions="Auto,*">
+                    <!-- Traces header -->
+                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="16,12,16,8">
+                        <TextBlock Text="Traces found" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Classes="pill pillGlass" Content="All"
+                                Padding="14,6" FontSize="10" Margin="0,0,8,0"
+                                Command="{Binding SelectAllTracesCommand}"/>
+                        <Button Grid.Column="2" Classes="pill pillGhost" Content="None"
+                                Padding="14,6" FontSize="10"
+                                Command="{Binding DeselectAllTracesCommand}"/>
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="1">
+                        <ItemsControl ItemsSource="{Binding Traces}" Margin="4,0,4,4">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="services:UninstallTrace">
+                                    <Border Padding="12,10" Classes="rowGlass" CornerRadius="8"
+                                            BorderBrush="#14FFFFFF"
+                                            BorderThickness="0,0,0,1">
+                                        <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                                            <CheckBox Grid.Column="0"
+                                                      IsChecked="{Binding IsSelected}"
+                                                      Margin="0,0,10,0" VerticalAlignment="Center"/>
+
+                                            <!-- Type badge -->
+                                            <Border Grid.Column="1" VerticalAlignment="Center"
+                                                    Background="#14FFFFFF"
+                                                    CornerRadius="8" Padding="7,3" Margin="0,0,10,0">
+                                                <TextBlock Text="{Binding Type}"
+                                                           FontSize="8" FontWeight="Bold"
+                                                           Foreground="{DynamicResource AccentBrush}" MaxLines="1"/>
+                                            </Border>
+
+                                            <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Path}"
+                                                           Foreground="{DynamicResource TextBrush}"
+                                                           FontSize="10" FontFamily="Consolas"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                <TextBlock Text="{Binding Description}"
+                                                           Foreground="{DynamicResource TextMutedBrush}"
+                                                           FontSize="9"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                            </StackPanel>
+
+                                            <TextBlock Grid.Column="3"
+                                                       VerticalAlignment="Center" Margin="12,0,0,0"
+                                                       Foreground="{DynamicResource AccentBrush}"
+                                                       FontSize="10"
+                                                       IsVisible="{Binding SizeBytes,
+                                                           Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                       Text="{Binding SizeBytes,
+                                                           Converter={StaticResource BytesToMBConverter}}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <!-- Stats bar -->
+            <Border Grid.Row="4" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    CornerRadius="18" Padding="16,10" Margin="0,10,0,0"
+                    IsVisible="{Binding HasTraces}">
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                    <TextBlock Text="{Binding StatusText}" FontSize="10"
+                               Foreground="{DynamicResource TextMutedBrush}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding TotalSelectedCount, StringFormat='{}{0} selected'}"
+                               FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
+                               Margin="12,0,12,0" VerticalAlignment="Center" MaxLines="1"/>
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding TotalSelectedSize, Converter={StaticResource BytesToMBConverter}}"
+                               FontSize="10" Foreground="{DynamicResource AccentLightBrush}"
+                               VerticalAlignment="Center" MaxLines="1"/>
+                </Grid>
+            </Border>
+
+        </Grid>
+    </Grid>
+</UserControl>

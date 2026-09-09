@@ -1,0 +1,222 @@
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using System;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Text.Json;
+using System.Threading.Tasks;
+using SystemGuard.Desktop.Services;
+
+namespace SystemGuard.Desktop.ViewModels;
+
+public partial class TelegramViewModel : ViewModelBase
+{
+    private readonly TelegramBotService _botService = new();
+    private readonly string _configPath;
+
+    [ObservableProperty] private string _botToken = "";
+    [ObservableProperty] private string _chatId = "";
+    [ObservableProperty] private string _statusText = "Enter bot token and chat ID, then click Connect";
+    [ObservableProperty] private string _commandInput = "";
+    [ObservableProperty] private string _filePathInput = "";
+    [ObservableProperty] private ObservableCollection<string> _logMessages = new();
+    [ObservableProperty] private bool _isConnected;
+    [ObservableProperty] private bool _isSending;
+    [ObservableProperty] private bool _isStreaming;
+    [ObservableProperty] private string _newUserId = "";
+    [ObservableProperty] private bool _newUserAdmin;
+
+    public IRelayCommand ConnectCommand { get; }
+    public IRelayCommand DisconnectCommand { get; }
+    public IRelayCommand SaveConfigCommand { get; }
+    public IRelayCommand SendStatusCommand { get; }
+    public IRelayCommand SendScreenshotCommand { get; }
+    public IRelayCommand ExecuteCmdCommand { get; }
+    public IRelayCommand ClearLogCommand { get; }
+    public IRelayCommand StartStreamCommand { get; }
+    public IRelayCommand StopStreamCommand { get; }
+    public IRelayCommand SendCamCommand { get; }
+    public IRelayCommand SendFileCommand { get; }
+    public IRelayCommand AddUserCommand { get; }
+    public IRelayCommand<string> RemoveUserCommand { get; }
+
+    public TelegramViewModel()
+    {
+        _configPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SystemGuard", "telegram.json");
+
+        ConnectCommand = new RelayCommand(Connect);
+        DisconnectCommand = new RelayCommand(Disconnect);
+        SaveConfigCommand = new RelayCommand(SaveConfig);
+        SendStatusCommand = new AsyncRelayCommand(SendStatus);
+        SendScreenshotCommand = new AsyncRelayCommand(SendScreenshot);
+        ExecuteCmdCommand = new AsyncRelayCommand(ExecuteCmd);
+        ClearLogCommand = new RelayCommand(() => LogMessages.Clear());
+        StartStreamCommand = new RelayCommand(StartStream);
+        StopStreamCommand = new RelayCommand(StopStream);
+        SendCamCommand = new AsyncRelayCommand(SendCam);
+        SendFileCommand = new AsyncRelayCommand(SendFile);
+        AddUserCommand = new RelayCommand(AddUser);
+        RemoveUserCommand = new RelayCommand<string>(RemoveUser);
+
+        LoadConfig();
+    }
+
+    private void Disconnect()
+    {
+        _botService.Disconnect();
+        IsConnected = false;
+        IsStreaming = false;
+        StatusText = "Bot disconnected";
+        AddLog("Bot disconnected");
+    }
+
+    private void AddUser()
+    {
+        if (!long.TryParse(NewUserId.Trim(), out var id)) { StatusText = "Enter numeric chat ID"; return; }
+        _botService.AddUser(id, NewUserAdmin);
+        StatusText = $"User {id} added ({(NewUserAdmin ? "admin" : "read-only")})";
+        AddLog(StatusText);
+        NewUserId = "";
+    }
+
+    private void RemoveUser(string? id)
+    {
+        if (!long.TryParse(id, out var uid)) return;
+        _botService.RemoveUser(uid);
+        StatusText = $"User {uid} removed";
+    }
+
+    private void LoadConfig()
+    {
+        try
+        {
+            if (File.Exists(_configPath))
+            {
+                var json = File.ReadAllText(_configPath);
+                var config = JsonSerializer.Deserialize<BotConfig>(json);
+                if (config != null)
+                {
+                    BotToken = config.Token;
+                    ChatId = config.ChatId;
+                    StatusText = "Config loaded. Click Connect.";
+                    AddLog("Config loaded from file");
+                }
+            }
+        }
+        catch { }
+    }
+
+    private void SaveConfig()
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(_configPath);
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir!);
+            var config = new BotConfig { Token = BotToken, ChatId = ChatId };
+            File.WriteAllText(_configPath, JsonSerializer.Serialize(config));
+            StatusText = "Config saved!";
+            AddLog("💾 Config saved");
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Error: {ex.Message}";
+        }
+    }
+
+    private void Connect()
+    {
+        if (string.IsNullOrWhiteSpace(BotToken) || string.IsNullOrWhiteSpace(ChatId))
+        {
+            StatusText = "Please enter bot token and chat ID";
+            return;
+        }
+        if (!long.TryParse(ChatId.Trim(), out _))
+        {
+            StatusText = "Chat ID must be numeric (see @userinfobot)";
+            return;
+        }
+        SaveConfig();
+        _botService.Configure(BotToken, ChatId);
+        _botService.StartListening();
+        IsConnected = true;
+        StatusText = "Bot connected and listening!";
+        AddLog("Bot connected — use /start in Telegram");
+    }
+
+    private async Task SendStatus()
+    {
+        if (!IsConnected) { StatusText = "Connect bot first"; return; }
+        IsSending = true;
+        var status = await _botService.GetSystemStatus();
+        var result = await _botService.SendMessage("System Status\n" + status);
+        AddLog("Status sent");
+        IsSending = false;
+    }
+
+    private async Task SendScreenshot()
+    {
+        if (!IsConnected) { StatusText = "Connect bot first"; return; }
+        IsSending = true;
+        var result = await _botService.SendScreenshot();
+        AddLog($"Screenshot: {result}");
+        IsSending = false;
+    }
+
+    private async Task ExecuteCmd()
+    {
+        if (!IsConnected) { StatusText = "Connect bot first"; return; }
+        if (string.IsNullOrWhiteSpace(CommandInput)) return;
+        IsSending = true;
+        var result = await _botService.ExecuteCommand(CommandInput);
+        AddLog($"{CommandInput}\n{result}");
+        CommandInput = "";
+        IsSending = false;
+    }
+
+    private void StartStream()
+    {
+        if (!IsConnected) { StatusText = "Connect bot first"; return; }
+        StatusText = _botService.StartStreamToConfigured();
+        IsStreaming = _botService.IsStreaming;
+        AddLog("Live stream started");
+    }
+
+    private void StopStream()
+    {
+        StatusText = _botService.StopAllStreams();
+        IsStreaming = false;
+        AddLog("Streams stopped");
+    }
+
+    private async Task SendCam()
+    {
+        if (!IsConnected) { StatusText = "Connect bot first"; return; }
+        IsSending = true;
+        await _botService.SendWebcamToConfigured();
+        AddLog("Webcam snapshot sent");
+        IsSending = false;
+    }
+
+    private async Task SendFile()
+    {
+        if (!IsConnected) { StatusText = "Connect bot first"; return; }
+        if (string.IsNullOrWhiteSpace(FilePathInput)) { StatusText = "Enter file path"; return; }
+        IsSending = true;
+        await _botService.SendFileToConfigured(FilePathInput.Trim().Trim('"'));
+        AddLog($"File sent: {FilePathInput}");
+        FilePathInput = "";
+        IsSending = false;
+    }
+
+    private void AddLog(string message)
+    {
+        LogMessages.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {message}");
+        if (LogMessages.Count > 50) LogMessages.RemoveAt(LogMessages.Count - 1);
+    }
+}
+
+internal class BotConfig
+{
+    public string Token { get; set; } = "";
+    public string ChatId { get; set; } = "";
+}

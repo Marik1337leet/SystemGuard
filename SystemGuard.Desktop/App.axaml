@@ -1,0 +1,104 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:views="using:SystemGuard.Desktop.Views"
+             xmlns:converters="using:SystemGuard.Desktop.Converters"
+             x:Class="SystemGuard.Desktop.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.Resources>
+        <!-- Конвертеры -->
+        <converters:BytesToMBConverter       x:Key="BytesToMBConverter"/>
+        <converters:BoolToAccentBrushConverter x:Key="BoolToAccentBrushConverter"/>
+        <converters:BoolToForegroundConverter  x:Key="BoolToForegroundConverter"/>
+        <converters:BoolToToggleTextConverter  x:Key="BoolToToggleTextConverter"/>
+        <converters:BoolToOpacityConverter     x:Key="BoolToOpacityConverter"/>
+        <converters:ActionToColorConverter     x:Key="ActionToColorConverter"/>
+        <converters:TabBrushConverter          x:Key="TabBrushConverter"/>
+        <converters:HexToColorConverter        x:Key="HexToColorConverter"/>
+
+        <!-- Цвета по умолчанию -->
+        <Color x:Key="BgColor">#050508</Color>
+        <Color x:Key="CardColor">#0C0A15</Color>
+        <Color x:Key="CardAltColor">#080610</Color>
+        <Color x:Key="BorderColor">#1A1530</Color>
+        <Color x:Key="AccentColor">#C96C9E</Color>
+        <Color x:Key="AccentLightColor">#D48CB5</Color>
+        <Color x:Key="TextColor">#FAFAFA</Color>
+        <Color x:Key="TextMutedColor">#71798A</Color>
+        <Color x:Key="DangerColor">#FB7185</Color>
+        <Color x:Key="SuccessColor">#34D399</Color>
+        <Color x:Key="WarningColor">#FBBF24</Color>
+        <Color x:Key="InfoColor">#38BDF8</Color>
+
+        <!-- Кисти -->
+        <SolidColorBrush x:Key="BgBrush"          Color="{DynamicResource BgColor}"/>
+        <SolidColorBrush x:Key="CardBrush"         Color="{DynamicResource CardColor}"/>
+        <SolidColorBrush x:Key="CardAltBrush"      Color="{DynamicResource CardAltColor}"/>
+        <SolidColorBrush x:Key="BorderBrush"       Color="{DynamicResource BorderColor}"/>
+        <SolidColorBrush x:Key="AccentBrush"       Color="{DynamicResource AccentColor}"/>
+        <SolidColorBrush x:Key="AccentLightBrush"  Color="{DynamicResource AccentLightColor}"/>
+        <SolidColorBrush x:Key="TextBrush"         Color="{DynamicResource TextColor}"/>
+        <SolidColorBrush x:Key="TextMutedBrush"    Color="{DynamicResource TextMutedColor}"/>
+        <SolidColorBrush x:Key="DangerBrush"       Color="{DynamicResource DangerColor}"/>
+        <SolidColorBrush x:Key="SuccessBrush"      Color="{DynamicResource SuccessColor}"/>
+        <SolidColorBrush x:Key="WarningBrush"      Color="{DynamicResource WarningColor}"/>
+        <SolidColorBrush x:Key="InfoBrush"         Color="{DynamicResource InfoColor}"/>
+
+        <!-- Тень -->
+        <BoxShadows x:Key="CardShadow">0 4 24 0 #00000055</BoxShadows>
+    </Application.Resources>
+
+    <!-- DataTemplates: каждый VM → свой View -->
+    <Application.DataTemplates>
+        <DataTemplate DataType="vm:DashboardViewModel">
+            <views:DashboardView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:ProcessManagerViewModel">
+            <views:ProcessManagerView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:DiskCleanupViewModel">
+            <views:DiskCleanupView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:DeepUninstallViewModel">
+            <views:DeepUninstallView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:PerformanceViewModel">
+            <views:PerformanceView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:GameModeViewModel">
+            <views:GameModeView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:NetworkViewModel">
+            <views:NetworkView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:StartupViewModel">
+            <views:StartupView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:TelegramViewModel">
+            <views:TelegramView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:SchedulerViewModel">
+            <views:SchedulerView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:LicenseViewModel">
+            <views:LicenseView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:SettingsViewModel">
+            <views:SettingsView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:ColorPickerViewModel">
+            <views:ColorPickerView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:AppearancePacksViewModel">
+            <views:AppearancePacksView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:SecurityViewModel">
+            <views:SecurityView/>
+        </DataTemplate>
+    </Application.DataTemplates>
+
+    <Application.Styles>
+        <FluentTheme/>
+    </Application.Styles>
+</Application>

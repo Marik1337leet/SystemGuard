@@ -1,0 +1,157 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:models="using:SystemGuard.Desktop.Models"
+             x:Class="SystemGuard.Desktop.Views.ProcessManagerView"
+             x:DataType="vm:ProcessManagerViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.pill">
+            <Setter Property="Padding" Value="16,9"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.pillGlass">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Button.pillGhost">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Button.pill:pointerover">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style Selector="Button.pill:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+        <Style Selector="Border.rowGlass:pointerover">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <Panel Grid.Row="0" Margin="0,0,0,12">
+            <Border CornerRadius="22" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    BoxShadow="0 8 24 -8 #4D000000" Padding="18">
+                <StackPanel Spacing="12">
+                    <TextBox Text="{Binding SearchText}" Watermark="Search by name, PID, path, company…"
+                             Background="#14FFFFFF" BorderThickness="0" CornerRadius="16"
+                             Foreground="{DynamicResource TextBrush}" Padding="16,10"/>
+                    <Grid ColumnDefinitions="*,*,Auto">
+                        <ComboBox ItemsSource="{Binding ProcessFilters}" SelectedItem="{Binding ProcessFilter}"
+                                  Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
+                                  Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0,0,8,0">
+                            <CheckBox IsChecked="{Binding AutoRefreshEnabled}" Content="Auto" Foreground="{DynamicResource TextBrush}" FontSize="11" VerticalAlignment="Center"/>
+                            <Slider Value="{Binding AutoRefreshSeconds}" Minimum="2" Maximum="5" TickFrequency="1" IsSnapToTickEnabled="True" Width="80" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding AutoRefreshSeconds, StringFormat='{}{0}s'}" FontSize="10" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button Grid.Column="2" Classes="pill pillGlass" Content="Refresh" Command="{Binding RefreshCommand}"/>
+                    </Grid>
+                    <WrapPanel>
+                        <Button Classes="pill pillGlass" Content="Kill" Command="{Binding KillCommand}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGlass" Content="Force kill" Command="{Binding KillForceCommand}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGlass" Content="Kill tree" Command="{Binding KillTreeCommand}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGhost" Content="Suspend" Command="{Binding SuspendCommand}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGhost" Content="Resume" Command="{Binding ResumeCommand}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGhost" Content="Dump" Command="{Binding DumpCommand}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGhost" Content="VirusTotal" Command="{Binding CheckVirusTotalCommand}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGhost" Content="Open folder" Command="{Binding OpenLocationCommand}" Margin="0,0,8,8"/>
+                    </WrapPanel>
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="PRIORITY" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                        <ItemsControl ItemsSource="{Binding PriorityLevels}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Classes="pill pillGhost" Content="{Binding}" Margin="0,0,6,6" Padding="12,6" FontSize="10"
+                                            Command="{Binding $parent[UserControl].((vm:ProcessManagerViewModel)DataContext).SetPriorityCommand}"
+                                            CommandParameter="{Binding}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Text="{Binding AffinityMask}" Watermark="Affinity mask, e.g. 0x3"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
+                                 Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontFamily="Consolas" FontSize="11"/>
+                        <Button Grid.Column="1" Classes="pill pillGlass" Content="Set affinity" Command="{Binding ApplyAffinityCommand}"/>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Text="{Binding DllPath}" Watermark="DLL path for inject (developers)…"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
+                                 Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontFamily="Consolas" FontSize="11"/>
+                        <Button Grid.Column="1" Classes="pill pillGhost" Content="Inject DLL" Command="{Binding InjectDllCommand}"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            <Border CornerRadius="22" IsHitTestVisible="False">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,50%">
+                        <GradientStop Color="#14FFFFFF" Offset="0"/>
+                        <GradientStop Color="#00FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
+        </Panel>
+
+        <Border Grid.Row="1" CornerRadius="24" Background="{DynamicResource CardBrush}"
+                BorderBrush="#1FFFFFFF" BorderThickness="1"
+                BoxShadow="0 8 24 -8 #4D000000" Padding="8">
+            <ScrollViewer>
+                <ListBox ItemsSource="{Binding Processes}" SelectedItem="{Binding SelectedProcess}"
+                         Background="Transparent" BorderThickness="0" Padding="4">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="models:ProcessModel">
+                            <Border Padding="14,10" Classes="rowGlass" CornerRadius="10"
+                                    BorderBrush="#14FFFFFF" BorderThickness="0,0,0,1">
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+                                    <TextBlock Grid.Column="0" Text="{Binding Pid}" Width="52"
+                                               Foreground="{DynamicResource TextMutedBrush}" FontSize="10"
+                                               VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{DynamicResource TextBrush}"
+                                               FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
+                                               Margin="0,0,10,0" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                    <StackPanel Grid.Column="2" Spacing="1" Margin="0,0,12,0" HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding CpuUsage, StringFormat='{}{0:F1}%'}" FontSize="13" FontWeight="Bold"
+                                                   Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Right" MaxLines="1"/>
+                                        <TextBlock Text="CPU" FontSize="8" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="3" Spacing="1" Margin="0,0,12,0" HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding MemoryMB, StringFormat='{}{0:F0} MB'}" FontSize="13" FontWeight="Bold"
+                                                   Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" MaxLines="1"/>
+                                        <TextBlock Text="RAM" FontSize="8" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4" Spacing="1" HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding ThreadCount}" FontSize="13" FontWeight="Bold"
+                                                   Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right"/>
+                                        <TextBlock Text="THR" FontSize="8" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </ScrollViewer>
+        </Border>
+
+        <Border Grid.Row="2" Background="{DynamicResource CardBrush}"
+                BorderBrush="#1FFFFFFF" BorderThickness="1"
+                CornerRadius="16" Padding="16,10" Margin="0,12,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Border Width="7" Height="7" CornerRadius="4" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</UserControl>

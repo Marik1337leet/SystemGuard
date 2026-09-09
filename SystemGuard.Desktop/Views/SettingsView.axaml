@@ -1,0 +1,287 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             x:Class="SystemGuard.Desktop.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.pill">
+            <Setter Property="Padding" Value="20,12"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.pillPrimary">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BgBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.pillGlass">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Button.pillGhost">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Button.pill:pointerover">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style Selector="Button.pill:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*">
+
+        <Border Grid.Row="0" Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
+                BorderThickness="1" CornerRadius="20" Padding="8" Margin="0,0,0,12">
+            <WrapPanel HorizontalAlignment="Center">
+                <Button Classes="pill" Content="General" Margin="0,0,8,8"
+                        Command="{Binding SelectTabCommand}" CommandParameter="General"
+                        Background="{Binding IsGeneralTab, Converter={StaticResource BoolToAccentBrushConverter}}"
+                        Foreground="{Binding IsGeneralTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                <Button Classes="pill" Content="Appearance" Margin="0,0,8,8"
+                        Command="{Binding SelectTabCommand}" CommandParameter="Appearance"
+                        Background="{Binding IsAppearanceTab, Converter={StaticResource BoolToAccentBrushConverter}}"
+                        Foreground="{Binding IsAppearanceTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                <Button Classes="pill" Content="Colors" Margin="0,0,8,8"
+                        Command="{Binding SelectTabCommand}" CommandParameter="Colors"
+                        Background="{Binding IsColorsTab, Converter={StaticResource BoolToAccentBrushConverter}}"
+                        Foreground="{Binding IsColorsTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                <Button Classes="pill" Content="Telegram" Margin="0,0,8,8"
+                        Command="{Binding SelectTabCommand}" CommandParameter="Telegram"
+                        Background="{Binding IsTelegramTab, Converter={StaticResource BoolToAccentBrushConverter}}"
+                        Foreground="{Binding IsTelegramTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                <Button Classes="pill" Content="Scheduler" Margin="0,0,8,8"
+                        Command="{Binding SelectTabCommand}" CommandParameter="Scheduler"
+                        Background="{Binding IsSchedulerTab, Converter={StaticResource BoolToAccentBrushConverter}}"
+                        Foreground="{Binding IsSchedulerTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                <Button Classes="pill" Content="License" Margin="0,0,8,0"
+                        Command="{Binding SelectTabCommand}" CommandParameter="License"
+                        Background="{Binding IsLicenseTab, Converter={StaticResource BoolToAccentBrushConverter}}"
+                        Foreground="{Binding IsLicenseTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+            </WrapPanel>
+        </Border>
+
+        <Border Grid.Row="1" Background="#14FFFFFF" CornerRadius="16" Padding="16,12" Margin="0,0,0,12"
+                BorderBrush="#1FFFFFFF" BorderThickness="1"
+                IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource AccentBrush}" FontSize="11"/>
+        </Border>
+
+        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                      IsVisible="{Binding IsGeneralTab}">
+        <StackPanel Spacing="14" Margin="0,0,0,8">
+
+            <!-- Account (Google / Apple) -->
+            <Panel>
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 10 30 -8 #59000000" Padding="22">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Account" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding AccountEmail}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextBrush}"
+                                           TextTrimming="CharacterEllipsis" MaxLines="1"
+                                           IsVisible="{Binding IsSignedIn}"/>
+                                <TextBlock Text="{Binding AccountProvider, StringFormat='via {0}'}"
+                                           FontSize="10" Foreground="{DynamicResource AccentLightBrush}"
+                                           IsVisible="{Binding IsSignedIn}"/>
+                                <TextBlock Text="Not signed in — sign in to sync license across devices"
+                                           FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                                           TextWrapping="Wrap"
+                                           IsVisible="{Binding !IsSignedIn}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="pill pillGhost" Content="Sign out"
+                                    VerticalAlignment="Center"
+                                    Command="{Binding SignOutCommand}"
+                                    IsVisible="{Binding IsSignedIn}"/>
+                        </Grid>
+                        <WrapPanel IsVisible="{Binding !IsSignedIn}">
+                            <Button Classes="pill pillPrimary" Content="Sign in with Google"
+                                    Margin="0,0,8,8" Command="{Binding SignInGoogleCommand}"
+                                    IsEnabled="{Binding !IsSigningIn}"/>
+                            <Button Classes="pill pillGlass" Content="Sign in with Apple"
+                                    Margin="0,0,8,8" Command="{Binding SignInAppleCommand}"
+                                    IsEnabled="{Binding !IsSigningIn}"/>
+                        </WrapPanel>
+                        <TextBlock Text="{Binding AccountStatus}" FontSize="10"
+                                   Foreground="{DynamicResource AccentLightBrush}" TextWrapping="Wrap" MaxLines="3"
+                                   IsVisible="{Binding AccountStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    </StackPanel>
+                </Border>
+                <Border CornerRadius="24" IsHitTestVisible="False">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
+                            <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                            <GradientStop Color="#00FFFFFF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Panel>
+
+            <!-- General -->
+            <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
+                    BorderThickness="1" CornerRadius="24" Padding="22"
+                    BoxShadow="0 8 24 -8 #4D000000">
+                <StackPanel Spacing="0">
+                    <TextBlock Text="General" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextBrush}" Margin="0,0,0,8"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Dark Theme" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="Enable dark mode interface" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.DarkTheme}"/>
+                    </Grid>
+                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Start with Windows" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="Launch on system startup" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.StartWithWindows}"/>
+                    </Grid>
+                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Minimize to Tray" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="Minimize to system tray" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.MinimizeToTray}"/>
+                    </Grid>
+                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Auto Update" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="Check for updates automatically" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.AutoUpdate}"/>
+                    </Grid>
+                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Start Minimized" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="Launch hidden to tray area" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.StartMinimized}"/>
+                    </Grid>
+                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Show Tray Icon" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="Keep icon in system tray" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.ShowTrayIcon}"/>
+                    </Grid>
+                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Notifications" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="System event notifications" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.ShowNotifications}"/>
+                    </Grid>
+                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                        <Slider Value="{Binding Settings.MonitoringIntervalMs}" Minimum="500" Maximum="5000"
+                                TickFrequency="500" IsSnapToTickEnabled="True" Width="220"
+                                VerticalAlignment="Center" Margin="0,0,12,0"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Settings.MonitoringIntervalMs, StringFormat='Monitor: {0} ms'}"
+                                   FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Language -->
+            <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
+                    BorderThickness="1" CornerRadius="24" Padding="22"
+                    BoxShadow="0 8 24 -8 #4D000000">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Language" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                    <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage}"
+                              Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                              Foreground="{DynamicResource TextBrush}" Padding="16,11"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Actions -->
+            <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
+                    BorderThickness="1" CornerRadius="24" Padding="22"
+                    BoxShadow="0 8 24 -8 #4D000000">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Actions" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+
+                    <WrapPanel>
+                        <Button Classes="pill pillPrimary" Content="Save Settings"
+                                Margin="0,0,8,8" Command="{Binding SaveCommand}"/>
+                        <Button Classes="pill pillGhost" Content="Export"
+                                Margin="0,0,8,8" Command="{Binding ExportCommand}"/>
+                        <Button Classes="pill pillGhost" Content="Import"
+                                Margin="0,0,8,8" Command="{Binding ImportCommand}"/>
+                        <Button Classes="pill pillGhost" Content="Reset"
+                                Margin="0,0,8,8" Command="{Binding ResetCommand}"/>
+                        <Button Classes="pill pillGlass" Content="Check Updates"
+                                Margin="0,0,8,8" Command="{Binding CheckUpdateCommand}" IsEnabled="{Binding !IsCheckingUpdate}"/>
+                        <Button Classes="pill pillGhost" Content="App Data"
+                                Margin="0,0,8,8" Command="{Binding OpenAppDataCommand}"/>
+                        <Button Classes="pill pillPrimary" Content="Download update"
+                                Margin="0,0,8,8" Command="{Binding OpenReleasePageCommand}"
+                                IsVisible="{Binding IsUpdateAvailable}"/>
+                    </WrapPanel>
+                    <TextBlock FontSize="10" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap">
+                        <Run Text="Last check: "/><Run Text="{Binding Settings.LastCheckUpdate}"/>
+                        <Run Text="   Latest: "/><Run Text="{Binding LatestVersion}"/>
+                    </TextBlock>
+                    <TextBlock Text="Telegram and Scheduler live in their tabs above."
+                               FontSize="10" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- About -->
+            <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
+                    BorderThickness="1" CornerRadius="24" Padding="22"
+                    BoxShadow="0 8 24 -8 #4D000000">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="About" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                    <Grid ColumnDefinitions="Auto,*">
+                        <Border CornerRadius="14" Width="44" Height="44" Margin="0,0,14,0">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                    <GradientStop Color="{DynamicResource AccentColor}" Offset="0"/>
+                                    <GradientStop Color="{DynamicResource AccentLightColor}" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <TextBlock Text="SG" FontSize="16" FontWeight="Black" Foreground="{DynamicResource BgBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Text="System Guard" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="{Binding Settings.Version, StringFormat='Version {0}'}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+
+        <!-- Appearance — оформление Windows/таскбар/док/виджеты -->
+        <ContentControl Grid.Row="2" Content="{Binding Appearance}" IsVisible="{Binding IsAppearanceTab}"/>
+        <!-- Colors — полная палитра + свои профили -->
+        <ContentControl Grid.Row="2" Content="{Binding Colors}" IsVisible="{Binding IsColorsTab}"/>
+        <!-- Telegram — бот и удалённое управление -->
+        <ContentControl Grid.Row="2" Content="{Binding Telegram}" IsVisible="{Binding IsTelegramTab}"/>
+        <!-- Scheduler — задачи и автоматизация -->
+        <ContentControl Grid.Row="2" Content="{Binding Scheduler}" IsVisible="{Binding IsSchedulerTab}"/>
+        <!-- License — активация и тарифы -->
+        <ContentControl Grid.Row="2" Content="{Binding License}" IsVisible="{Binding IsLicenseTab}"/>
+
+    </Grid>
+</UserControl>

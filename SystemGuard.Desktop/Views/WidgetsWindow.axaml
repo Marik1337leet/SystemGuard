@@ -1,0 +1,18 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SystemGuard.Desktop.Views.WidgetsWindow"
+        Title="SystemGuard Widgets"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        SystemDecorations="None"
+        ShowInTaskbar="False"
+        Topmost="True"
+        CanResize="False"
+        ShowActivated="False"
+        SizeToContent="WidthAndHeight">
+
+    <StackPanel x:Name="Cards" Spacing="10" Margin="0,10,10,0" Width="230"/>
+</Window>

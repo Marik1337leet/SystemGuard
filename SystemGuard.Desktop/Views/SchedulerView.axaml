@@ -1,0 +1,246 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:services="using:SystemGuard.Desktop.Services"
+             x:Class="SystemGuard.Desktop.Views.SchedulerView"
+             x:DataType="vm:SchedulerViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.pill">
+            <Setter Property="Padding" Value="20,12"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.pillPrimary">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BgBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.pillGlass">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Button.pillGhost">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Button.pill:pointerover">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style Selector="Button.pill:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*">
+
+        <!-- ── New Task Form ──────────────────────────────────────────────── -->
+        <Panel Grid.Row="0" Margin="0,0,0,12">
+            <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    BoxShadow="0 10 30 -8 #59000000" Padding="22">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="New Task" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextBrush}"/>
+
+                    <Grid ColumnDefinitions="*,140,Auto">
+                        <TextBox Text="{Binding NewTaskName}"
+                                 Watermark="Task name"
+                                 Background="#14FFFFFF"
+                                 BorderThickness="0"
+                                 CornerRadius="14" Foreground="{DynamicResource TextBrush}"
+                                 Padding="16,11" Margin="0,0,8,0"/>
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding TaskTypes}"
+                                  SelectedItem="{Binding NewTaskType}"
+                                  Background="#14FFFFFF"
+                                  BorderThickness="0"
+                                  CornerRadius="14" Foreground="{DynamicResource TextBrush}"
+                                  Padding="14,10"
+                                  Margin="0,0,8,0"/>
+                        <Button Grid.Column="2" Classes="pill pillPrimary" Content="Add Task"
+                                Command="{Binding AddTaskCommand}"/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,Auto">
+                        <TextBlock Text="Date" FontSize="10"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <DatePicker Grid.Column="1"
+                                    SelectedDate="{Binding NewTaskDate}"
+                                    Background="#14FFFFFF"
+                                    Foreground="{DynamicResource TextBrush}"
+                                    Margin="0,0,12,0"/>
+                        <TextBlock Grid.Column="2" Text="Time" FontSize="10"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TimePicker Grid.Column="3"
+                                    SelectedTime="{Binding NewTaskTime}"
+                                    Background="#14FFFFFF"
+                                    Foreground="{DynamicResource TextBrush}"
+                                    Margin="0,0,12,0"/>
+                        <CheckBox Grid.Column="4"
+                                  IsChecked="{Binding NewTaskRecurring}"
+                                  Foreground="{DynamicResource TextBrush}"
+                                  FontSize="10" Margin="0,0,8,0">
+                            Recurring
+                        </CheckBox>
+                        <ComboBox Grid.Column="5"
+                                  ItemsSource="{Binding RecurrenceTypes}"
+                                  SelectedItem="{Binding NewTaskRecurrence}"
+                                  IsEnabled="{Binding NewTaskRecurring}"
+                                  Background="#14FFFFFF"
+                                  BorderThickness="0"
+                                  CornerRadius="14" Foreground="{DynamicResource TextBrush}"
+                                  Padding="14,10"/>
+                    </Grid>
+
+                    <TextBox Text="{Binding NewTaskCustomCommand}"
+                             Watermark="Custom command (e.g. defrag C: /U)"
+                             Background="#14FFFFFF"
+                             BorderThickness="0"
+                             CornerRadius="14" Foreground="{DynamicResource TextBrush}"
+                             Padding="16,11" FontFamily="Consolas" FontSize="11"
+                             IsVisible="{Binding IsCustomTaskType}"/>
+
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <TextBlock Text="Only if CPU above:" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <Slider Grid.Column="1" Value="{Binding NewTaskCpuThreshold}" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Grid.Column="2" Text="{Binding NewTaskCpuThreshold, StringFormat='{}{0:F0}% (0=always)'}" FontSize="10" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            <Border CornerRadius="24" IsHitTestVisible="False">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
+                        <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                        <GradientStop Color="#00FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
+        </Panel>
+
+        <!-- ── Stats ─────────────────────────────────────────────────────── -->
+        <Border Grid.Row="1" Background="{DynamicResource CardBrush}"
+                BorderBrush="#1FFFFFFF" BorderThickness="1"
+                CornerRadius="18" Padding="18,12" Margin="0,0,0,12">
+            <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                   Text="Total:" VerticalAlignment="Center"/>
+                        <TextBlock FontSize="16" FontWeight="Black"
+                                   Foreground="{DynamicResource TextBrush}"
+                                   Text="{Binding TaskCount}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="20,0,0,0">
+                        <TextBlock FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                   Text="Active:" VerticalAlignment="Center"/>
+                        <TextBlock FontSize="16" FontWeight="Black"
+                                   Foreground="{DynamicResource AccentBrush}"
+                                   Text="{Binding ActiveTaskCount}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Text="{Binding StatusText}"
+                               FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                               VerticalAlignment="Center" Margin="20,0,0,0"
+                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                    <Button Grid.Column="3" Classes="pill pillGhost" Content="Refresh"
+                            Command="{Binding RefreshCommand}"/>
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Text="{Binding SlackWebhook}" Watermark="Slack webhook URL for reports…"
+                             Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
+                             Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontSize="11"/>
+                    <Button Grid.Column="1" Classes="pill pillGlass" Content="Send report to Slack" Command="{Binding SendReportCommand}"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ── Tasks List ─────────────────────────────────────────────────── -->
+        <ScrollViewer Grid.Row="2">
+            <ItemsControl ItemsSource="{Binding Tasks}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="services:ScheduledTask">
+                        <Border Background="{DynamicResource CardBrush}"
+                                BorderBrush="#1FFFFFFF" BorderThickness="1"
+                                CornerRadius="20" Padding="18,14" Margin="0,4"
+                                BoxShadow="0 8 24 -8 #4D000000">
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+                                <Border Width="9" Height="9" CornerRadius="5"
+                                        VerticalAlignment="Center" Margin="0,0,14,0"
+                                        Background="{DynamicResource AccentBrush}"
+                                        IsVisible="{Binding IsEnabled}"/>
+                                <Border Width="9" Height="9" CornerRadius="5"
+                                        VerticalAlignment="Center" Margin="0,0,14,0"
+                                        Background="#3D71798A"
+                                        IsVisible="{Binding !IsEnabled}"/>
+
+                                <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}"
+                                               Foreground="{DynamicResource TextBrush}"
+                                               FontSize="13" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <Border Background="#14FFFFFF"
+                                                CornerRadius="8" Padding="8,3">
+                                            <TextBlock Text="{Binding Type}"
+                                                       Foreground="{DynamicResource AccentBrush}"
+                                                       FontSize="9" FontWeight="SemiBold"/>
+                                        </Border>
+                                        <TextBlock Foreground="{DynamicResource TextMutedBrush}"
+                                                   FontSize="9" VerticalAlignment="Center"
+                                                   Text="{Binding ExecuteAt, StringFormat='{}{0:dd MMM yyyy HH:mm}'}"/>
+                                        <TextBlock Foreground="{DynamicResource AccentLightBrush}"
+                                                   FontSize="9" VerticalAlignment="Center"
+                                                   IsVisible="{Binding IsRecurring}"
+                                                   Text="{Binding Recurrence, StringFormat='Repeat: {0}'}"/>
+                                        <TextBlock Foreground="{DynamicResource WarningBrush}"
+                                                   FontSize="9" VerticalAlignment="Center"
+                                                   Text="{Binding CpuAboveThreshold, StringFormat='CPU&gt;{0:F0}%'}"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <Button Grid.Column="2" Margin="0,0,8,0" VerticalAlignment="Center"
+                                        Classes="pill pillGlass" Padding="14,7" FontSize="10"
+                                        Command="{Binding $parent[UserControl].((vm:SchedulerViewModel)DataContext).RunNowCommand}"
+                                        CommandParameter="{Binding Id}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Data="M8 5v14l11-7z" Fill="{DynamicResource AccentBrush}"
+                                              Width="9" Height="9" Stretch="Uniform"/>
+                                        <TextBlock Text="Run" FontSize="10"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <Button Grid.Column="3" Margin="0,0,8,0" VerticalAlignment="Center"
+                                        Classes="pill pillGlass" Padding="14,7" FontSize="10"
+                                        Command="{Binding $parent[UserControl].((vm:SchedulerViewModel)DataContext).ToggleTaskCommand}"
+                                        CommandParameter="{Binding Id}">
+                                    <TextBlock FontSize="10"
+                                               Text="{Binding IsEnabled,
+                                                   Converter={StaticResource BoolToToggleTextConverter}}"/>
+                                </Button>
+
+                                <Button Grid.Column="4" VerticalAlignment="Center"
+                                        Classes="pill pillGhost" Padding="0" Width="34" Height="34"
+                                        CornerRadius="17"
+                                        Command="{Binding $parent[UserControl].((vm:SchedulerViewModel)DataContext).RemoveTaskCommand}"
+                                        CommandParameter="{Binding Id}">
+                                    <Path Data="M6 6l12 12M18 6L6 18"
+                                          Stroke="{DynamicResource AccentBrush}"
+                                          StrokeThickness="2" Width="11" Height="11"
+                                          Stretch="Uniform"/>
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+    </Grid>
+</UserControl>

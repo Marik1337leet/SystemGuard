@@ -1,0 +1,388 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:services="using:SystemGuard.Desktop.Services"
+             x:Class="SystemGuard.Desktop.Views.NetworkView"
+             x:DataType="vm:NetworkViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.pill">
+            <Setter Property="Padding" Value="16,9"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.pillGlass">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Button.pillGhost">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Button.pill:pointerover">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style Selector="Button.pill:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+        <Style Selector="Button.segment">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="RenderTransform" Value="scale(1)"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.segment:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.94)"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*">
+
+        <!-- ── Droplet tabs + actions ──────────────────────────────────────── -->
+        <Panel Grid.Row="0" Margin="0,0,0,12">
+            <Border CornerRadius="22" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    BoxShadow="0 8 24 -8 #4D000000" Padding="18">
+                <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Border Width="536" Height="44" CornerRadius="22" Background="{DynamicResource CardBrush}"
+                                BorderBrush="#1FFFFFFF" BorderThickness="1" ClipToBounds="True" Padding="4"
+                                HorizontalAlignment="Left">
+                            <Panel Width="528" Height="36" ClipToBounds="True">
+                                <Border x:Name="TabIndicator" Width="132" Height="36" CornerRadius="18"
+                                        Background="{DynamicResource AccentBrush}"
+                                        HorizontalAlignment="Left" VerticalAlignment="Center">
+                                    <Border.Transitions>
+                                        <Transitions>
+                                            <ThicknessTransition Property="Margin" Duration="0:0:0.5" Easing="CubicEaseInOut"/>
+                                        </Transitions>
+                                    </Border.Transitions>
+                                </Border>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Width="132" Height="36" Classes="segment" Click="AdaptersTab_Click">
+                                        <TextBlock Text="Adapters" FontSize="11.5" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                                   Foreground="{Binding IsAdaptersTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                                    </Button>
+                                    <Button Width="132" Height="36" Classes="segment" Click="TrafficTab_Click">
+                                        <TextBlock Text="Traffic" FontSize="11.5" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                                   Foreground="{Binding IsTrafficTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                                    </Button>
+                                    <Button Width="132" Height="36" Classes="segment" Click="FirewallTab_Click">
+                                        <TextBlock Text="Firewall" FontSize="11.5" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                                   Foreground="{Binding IsFirewallTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                                    </Button>
+                                    <Button Width="132" Height="36" Classes="segment" Click="ToolsTab_Click">
+                                        <TextBlock Text="Tools" FontSize="11.5" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                                   Foreground="{Binding IsToolsTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                                    </Button>
+                                </StackPanel>
+                            </Panel>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button Classes="pill pillGlass" Content="Speed Test" Command="{Binding TestSpeedCommand}"
+                                    IsEnabled="{Binding !IsTestingSpeed}"/>
+                            <Button Classes="pill pillGhost" Content="Flush DNS" Command="{Binding FlushDnsCommand}"/>
+                            <Button Classes="pill pillGhost" Content="Reset" Command="{Binding ResetNetworkCommand}"/>
+                            <Button Classes="pill pillGhost" Content="Ping" Command="{Binding TestLatencyCommand}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                        <TextBlock Text="{Binding StatusText}" FontSize="10"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                        <TextBlock Grid.Column="1" Text="{Binding SpeedTestResult}" FontSize="10"
+                                   Foreground="{DynamicResource AccentBrush}" Margin="0,0,16,0"
+                                   IsVisible="{Binding SpeedTestResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding ExternalIp, StringFormat='WAN: {0}'}"
+                                   FontSize="10" Foreground="{DynamicResource AccentLightBrush}"
+                                   Margin="0,0,16,0" MaxLines="1"/>
+                        <TextBlock Grid.Column="3"
+                                   Text="{Binding LatencyText}"
+                                   FontSize="10" Foreground="{DynamicResource AccentBrush}" MaxLines="1"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            <Border CornerRadius="22" IsHitTestVisible="False">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,50%">
+                        <GradientStop Color="#14FFFFFF" Offset="0"/>
+                        <GradientStop Color="#00FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
+        </Panel>
+
+        <!-- ── Tab Content ───────────────────────────────────────────────── -->
+        <Panel Grid.Row="2" Grid.RowSpan="1">
+
+            <!-- Adapters -->
+            <ScrollViewer IsVisible="{Binding IsAdaptersTab}" Grid.Row="1">
+                <ItemsControl ItemsSource="{Binding Adapters}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="services:NetworkAdapterInfo">
+                            <Border Background="{DynamicResource CardBrush}"
+                                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                                    CornerRadius="20" Padding="20" Margin="0,4"
+                                    BoxShadow="0 8 24 -8 #4D000000">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="{DynamicResource TextBrush}"
+                                                       FontSize="13" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                            <TextBlock Text="{Binding Description}"
+                                                       Foreground="{DynamicResource TextMutedBrush}"
+                                                       FontSize="9" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" CornerRadius="12" Padding="10,5" VerticalAlignment="Center"
+                                                Background="{DynamicResource AccentBrush}"
+                                                IsVisible="{Binding IsConnected}">
+                                            <TextBlock Text="{Binding Status}"
+                                                       FontSize="9" FontWeight="Bold"
+                                                       Foreground="{DynamicResource BgBrush}"/>
+                                        </Border>
+                                    </Grid>
+                                    <Grid ColumnDefinitions="*,*,*">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="IP" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"/>
+                                            <TextBlock Text="{Binding IpAddress}" FontSize="11"
+                                                       Foreground="{DynamicResource AccentLightBrush}"
+                                                       TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="MAC" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"/>
+                                            <TextBlock Text="{Binding MacAddress}" FontSize="11"
+                                                       Foreground="{DynamicResource TextBrush}" FontFamily="Consolas"
+                                                       TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Spacing="2">
+                                            <TextBlock Text="SPEED" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"/>
+                                            <TextBlock Text="{Binding SpeedText}" FontSize="11"
+                                                       Foreground="{DynamicResource TextBrush}" MaxLines="1"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Traffic -->
+            <Panel IsVisible="{Binding IsTrafficTab}">
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 10 30 -8 #59000000" Padding="22">
+                    <StackPanel Spacing="16">
+                        <TextBlock Text="Live Traffic" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}"/>
+                        <Grid ColumnDefinitions="*,*">
+                            <Border Background="#14FFFFFF" CornerRadius="18"
+                                    Padding="20" Margin="0,0,6,0"
+                                    BorderBrush="#1FFFFFFF" BorderThickness="1">
+                                <StackPanel Spacing="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Data="M12 4v12m0 0l-5-5m5 5l5-5" Stroke="{DynamicResource TextMutedBrush}"
+                                              StrokeThickness="2" Width="10" Height="10" Stretch="Uniform"/>
+                                        <TextBlock Text="DOWNLOAD" FontSize="9"
+                                                   Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Traffic.DownloadMbps, StringFormat='{}{0:F2}'}"
+                                               FontSize="32" FontWeight="Black"
+                                               Foreground="{DynamicResource AccentLightBrush}"/>
+                                    <TextBlock Text="Mbps" FontSize="11" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock Text="{Binding Traffic.TotalDownloaded, Converter={StaticResource BytesToMBConverter}, StringFormat='Total: {0}'}"
+                                               FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="1" Background="#14FFFFFF"
+                                    CornerRadius="18" Padding="20" Margin="6,0,0,0"
+                                    BorderBrush="#1FFFFFFF" BorderThickness="1">
+                                <StackPanel Spacing="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Data="M12 20V8m0 0l-5 5m5-5l5 5" Stroke="{DynamicResource TextMutedBrush}"
+                                              StrokeThickness="2" Width="10" Height="10" Stretch="Uniform"/>
+                                        <TextBlock Text="UPLOAD" FontSize="9"
+                                                   Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Traffic.UploadMbps, StringFormat='{}{0:F2}'}"
+                                               FontSize="32" FontWeight="Black"
+                                               Foreground="{DynamicResource AccentBrush}"/>
+                                    <TextBlock Text="Mbps" FontSize="11" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock Text="{Binding Traffic.TotalUploaded, Converter={StaticResource BytesToMBConverter}, StringFormat='Total: {0}'}"
+                                               FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <Border CornerRadius="24" IsHitTestVisible="False">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
+                            <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                            <GradientStop Color="#00FFFFFF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Panel>
+
+            <!-- Firewall -->
+            <ScrollViewer IsVisible="{Binding IsFirewallTab}">
+                <StackPanel Spacing="8">
+                    <Border Background="{DynamicResource CardBrush}"
+                            BorderBrush="#1FFFFFFF" BorderThickness="1"
+                            CornerRadius="20" Padding="18">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Firewall Rules" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding FirewallRules.Count, StringFormat='{}{0} rules'}"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource TextMutedBrush}"/>
+                        </Grid>
+                    </Border>
+
+                    <ItemsControl ItemsSource="{Binding FirewallRules}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="services:FirewallRule">
+                                <Border Background="{DynamicResource CardBrush}"
+                                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                                        CornerRadius="16" Padding="16,12" Margin="0,2">
+                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
+                                        <TextBlock Text="{Binding Name}"
+                                                   Foreground="{DynamicResource TextBrush}"
+                                                   FontSize="11" TextTrimming="CharacterEllipsis" MaxLines="1"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Direction}"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   FontSize="9" HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding Action}"
+                                                   FontSize="9" HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" Margin="12,0,0,0">
+                                            <TextBlock.Foreground>
+                                                <Binding Path="Action"
+                                                         Converter="{StaticResource ActionToColorConverter}"/>
+                                            </TextBlock.Foreground>
+                                        </TextBlock>
+                                        <TextBlock Grid.Column="3"
+                                                   Text="{Binding Protocol}"
+                                                   Foreground="{DynamicResource TextMutedBrush}"
+                                                   FontSize="9" HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                        <Border Grid.Column="4"
+                                                Width="8" Height="8" CornerRadius="4"
+                                                VerticalAlignment="Center" Margin="12,0,0,0"
+                                                Background="{Binding IsEnabled, Converter={StaticResource BoolToAccentBrushConverter}}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Tools: DNS / hosts / ports -->
+            <ScrollViewer IsVisible="{Binding IsToolsTab}">
+                <StackPanel Spacing="12">
+                    <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1" CornerRadius="20" Padding="20">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="DNS Switch" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                            <Grid ColumnDefinitions="*,*,*,Auto">
+                                <ComboBox ItemsSource="{Binding DnsOptions}" SelectedItem="{Binding SelectedDnsOption}"
+                                          Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0"/>
+                                <TextBox Grid.Column="1" Text="{Binding CustomDns}" Watermark="Custom: 1.1.1.1, 1.0.0.1"
+                                         Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontFamily="Consolas" FontSize="11"/>
+                                <TextBox Grid.Column="2" Text="{Binding SelectedAdapter}" Watermark="Adapter"
+                                         Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontSize="11"/>
+                                <Button Grid.Column="3" Classes="pill pillGlass" Content="Apply DNS" Command="{Binding ApplyDnsCommand}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1" CornerRadius="20" Padding="20">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                                <TextBlock Text="Hosts Editor" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Classes="pill pillGhost" Content="Reload" Command="{Binding LoadHostsCommand}" Margin="0,0,8,0"/>
+                                <Button Grid.Column="2" Classes="pill pillGhost" Content="+ Adblock" Command="{Binding AddAdblockCommand}" Margin="0,0,8,0"/>
+                                <Button Grid.Column="3" Classes="pill pillGlass" Content="Save hosts" Command="{Binding SaveHostsCommand}"/>
+                            </Grid>
+                            <TextBox Text="{Binding HostsText}" AcceptsReturn="True" FontFamily="Consolas" FontSize="11"
+                                     Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,10" Height="200"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1" CornerRadius="20" Padding="20">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Port Scanner" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                                <TextBox Text="{Binding PortHost}" Watermark="Host"
+                                         Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontFamily="Consolas" FontSize="11"/>
+                                <TextBox Grid.Column="1" Text="{Binding PortFrom}" Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" Width="80"/>
+                                <TextBox Grid.Column="2" Text="{Binding PortTo}" Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" Width="80"/>
+                                <Button Grid.Column="3" Classes="pill pillGlass" Content="Scan" Command="{Binding ScanPortsCommand}" IsEnabled="{Binding !IsScanningPorts}"/>
+                            </Grid>
+                            <TextBlock Text="{Binding OpenPortsText}" FontSize="11" Foreground="{DynamicResource AccentBrush}" FontFamily="Consolas" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1" CornerRadius="20" Padding="20">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Text="Wi-Fi analysis" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Classes="pill pillGlass" Content="Scan Wi-Fi" Command="{Binding ScanWifiCommand}" IsEnabled="{Binding !IsScanningWifi}"/>
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding WifiNetworks}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="services:WifiNetwork">
+                                        <Border BorderBrush="#14FFFFFF" BorderThickness="0,0,0,1" Padding="10,8" CornerRadius="4">
+                                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                                <TextBlock Text="{Binding Ssid}" Foreground="{DynamicResource TextBrush}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding Signal}" Foreground="{DynamicResource AccentBrush}" FontSize="10" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="2" Text="{Binding Auth}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1" CornerRadius="20" Padding="20">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Traffic &amp; Wake-on-LAN" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="{Binding MonthTrafficText}" FontSize="11" Foreground="{DynamicResource AccentLightBrush}"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBox Text="{Binding WolMac}" Watermark="MAC for WoL, e.g. AA:BB:CC:DD:EE:FF"
+                                         Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontFamily="Consolas" FontSize="11"/>
+                                <Button Grid.Column="1" Classes="pill pillGlass" Content="Wake" Command="{Binding WakeCommand}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+        </Panel>
+    </Grid>
+</UserControl>

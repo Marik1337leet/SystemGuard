@@ -1,0 +1,506 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:services="using:SystemGuard.Desktop.Services"
+             xmlns:loc="using:SystemGuard.Desktop.Markup"
+             x:Class="SystemGuard.Desktop.Views.AppearancePacksView"
+             x:DataType="vm:AppearancePacksViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.pill">
+            <Setter Property="Padding" Value="20,12"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.pillPrimary">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BgBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.pillGlass">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Button.pillGhost">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Button.pill:pointerover">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style Selector="Button.pill:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+        <Style Selector="Button.segment">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="RenderTransform" Value="scale(1)"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.segment:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.94)"/>
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="0" Margin="28,22,28,22">
+
+            <!-- ══════ Header ══════ -->
+            <StackPanel Spacing="2" Margin="0,0,0,18">
+                <TextBlock Text="{loc:Loc Appearance}" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
+                <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource TextMutedBrush}"
+                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+            </StackPanel>
+
+            <!-- ══════ Hero: safety ══════ -->
+            <Panel Margin="0,0,0,18">
+                <Border CornerRadius="26" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 10 30 -8 #59000000" Padding="26,22">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="{loc:Loc SafeThemingTitle}" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}"/>
+                        <TextBlock Text="{loc:Loc SafeThemingDesc}" FontSize="11"
+                                   Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+                        <WrapPanel>
+                            <Button Classes="pill pillGlass" Content="{loc:Loc CreateRestorePoint}"
+                                    Command="{Binding RestorePointCommand}" IsEnabled="{Binding !IsWorking}" Margin="0,0,10,10"/>
+                            <Button Classes="pill pillGhost" Content="{loc:Loc WindowsThemes}"
+                                    Command="{Binding OpenThemesSettingsCommand}" Margin="0,0,10,10"/>
+                            <Button Classes="pill pillGhost" Content="{loc:Loc SetWallpaper}"
+                                    Command="{Binding WallpaperCommand}" Margin="0,0,10,10"/>
+                            <Button Classes="pill pillGhost" Content="Sync Windows accent"
+                                    Command="{Binding SyncWindowsAccentCommand}" Margin="0,0,10,10"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+                <Border CornerRadius="26" IsHitTestVisible="False">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,55%">
+                            <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                            <GradientStop Color="#00FFFFFF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Panel>
+
+            <!-- ══════ Droplet tabs: Style / Taskbar / Dock / Widgets ══════ -->
+            <Border Width="536" Height="44" CornerRadius="22" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1" ClipToBounds="True" Padding="4"
+                    HorizontalAlignment="Left" Margin="0,0,0,16">
+                <Panel Width="528" Height="36" ClipToBounds="True">
+                    <Border x:Name="TabIndicator" Width="132" Height="36" CornerRadius="18"
+                            Background="{DynamicResource AccentBrush}"
+                            HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <Border.Transitions>
+                            <Transitions>
+                                <ThicknessTransition Property="Margin" Duration="0:0:0.5" Easing="CubicEaseInOut"/>
+                            </Transitions>
+                        </Border.Transitions>
+                    </Border>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Width="132" Height="36" Classes="segment" Click="StyleTab_Click">
+                            <TextBlock Text="Style" FontSize="11.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                       Foreground="{Binding IsStyleTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                        </Button>
+                        <Button Width="132" Height="36" Classes="segment" Click="TaskbarTab_Click">
+                            <TextBlock Text="{loc:Loc Taskbar}" FontSize="11.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                       Foreground="{Binding IsTaskbarTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                        </Button>
+                        <Button Width="132" Height="36" Classes="segment" Click="DockTab_Click">
+                            <TextBlock Text="{loc:Loc Docks}" FontSize="11.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                       Foreground="{Binding IsDockTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                        </Button>
+                        <Button Width="132" Height="36" Classes="segment" Click="WidgetsTab_Click">
+                            <TextBlock Text="{loc:Loc Widgets}" FontSize="11.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                       Foreground="{Binding IsWidgetsTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                        </Button>
+                    </StackPanel>
+                </Panel>
+            </Border>
+
+            <!-- ══════ STYLE TAB ══════ -->
+            <StackPanel Spacing="12" IsVisible="{Binding IsStyleTab}">
+
+                <!-- Wallpaper + fit -->
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="20">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Wallpaper" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <ComboBox ItemsSource="{Binding Fits}" SelectedItem="{Binding SelectedFit}"
+                                      Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                      Foreground="{DynamicResource TextBrush}" Padding="14,10" Margin="0,0,10,0"/>
+                            <Button Grid.Column="1" Classes="pill pillPrimary" Content="{loc:Loc SetWallpaper}"
+                                    Command="{Binding WallpaperCommand}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Cursors -->
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="20">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Cursors" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                        <ComboBox ItemsSource="{Binding CursorSchemes}" SelectedItem="{Binding SelectedScheme}"
+                                  Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                  Foreground="{DynamicResource TextBrush}" Padding="14,10"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Slider Value="{Binding CursorSize}" Minimum="1" Maximum="15" TickFrequency="1"
+                                    IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding CursorSize, StringFormat='Size: {0}'}"
+                                       FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Cursor shadow" FontSize="12" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding CursorShadow}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Desktop icons + size -->
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="20">
+                    <StackPanel Spacing="0">
+                        <TextBlock Text="Desktop icons" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}" Margin="0,0,0,8"/>
+                        <ItemsControl ItemsSource="{Binding DesktopIcons}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DesktopIconRow">
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                                        <TextBlock Text="{Binding Name}" FontSize="12"
+                                                   Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsVisible}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,8"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                            <Slider Value="{Binding IconSize}" Minimum="16" Maximum="72" TickFrequency="4"
+                                    IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding IconSize, StringFormat='Icons: {0}px'}"
+                                       FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Sounds + Explorer -->
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="20">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Sounds &amp; Explorer" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                        <ComboBox ItemsSource="{Binding SoundSchemes}" SelectedItem="{Binding SelectedSound}"
+                                  Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                  Foreground="{DynamicResource TextBrush}" Padding="14,10"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                            <TextBlock Text="Hidden files" FontSize="12" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding HiddenFiles}"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="File extensions" FontSize="12" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowExtensions}"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Explorer opens This PC" FontSize="12" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding LaunchToThisPC}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Window metrics -->
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="20">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Title bars &amp; menus" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Slider Value="{Binding CaptionHeight}" Minimum="12" Maximum="48" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding CaptionHeight, StringFormat='Title: {0}px'}"
+                                       FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Slider Value="{Binding MenuHeight}" Minimum="12" Maximum="48" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding MenuHeight, StringFormat='Menu: {0}px'}"
+                                       FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Slider Value="{Binding ScrollbarSize}" Minimum="8" Maximum="40" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding ScrollbarSize, StringFormat='Scroll: {0}px'}"
+                                       FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ══════ TASKBAR TAB ══════ -->
+            <StackPanel Spacing="12" IsVisible="{Binding IsTaskbarTab}">
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="20">
+                    <StackPanel Spacing="0">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="{loc:Loc CenterIcons}" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="{loc:Loc CenterIconsDesc}" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding CenterIcons}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="{loc:Loc WidgetsBoard}" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="{loc:Loc WidgetsBoardDesc}" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding TaskWidgets}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="{loc:Loc ChatTeams}" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="{loc:Loc ChatTeamsDesc}" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding TaskChat}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="{loc:Loc TaskViewBtn}" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="{loc:Loc TaskViewBtnDesc}" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding TaskView}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                            <TextBlock Text="Seconds in clock" FontSize="12" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding SecondsClock}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="{loc:Loc TransparencyOpt}" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="{loc:Loc TransparencyDesc}" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding Transparency}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="{loc:Loc DarkModeOpt}" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="{loc:Loc DarkModeDesc}" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding DarkMode}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="20">
+                    <StackPanel Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Slider Value="{Binding TaskbarSize}" Minimum="0" Maximum="2" TickFrequency="1"
+                                    IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding TaskbarSize, StringFormat='Size: {0}'}"
+                                       FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Slider Value="{Binding CombineMode}" Minimum="0" Maximum="2" TickFrequency="1"
+                                    IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding CombineMode, StringFormat='Combine: {0}'}"
+                                       FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Slider Value="{Binding SearchMode}" Minimum="0" Maximum="3" TickFrequency="1"
+                                    IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding SearchMode, StringFormat='Search: {0}'}"
+                                       FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <WrapPanel>
+                    <Button Classes="pill pillGlass" Content="{loc:Loc RestartExplorer}"
+                            Command="{Binding RestartExplorerCommand}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillGhost" Content="{loc:Loc RestoreDefaults}"
+                            Command="{Binding RestoreDefaultsCommand}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillGhost" Content="{loc:Loc Refresh}"
+                            Command="{Binding RefreshCommand}" Margin="0,0,10,10"/>
+                </WrapPanel>
+            </StackPanel>
+
+            <!-- ══════ DOCK TAB ══════ -->
+            <StackPanel Spacing="12" IsVisible="{Binding IsDockTab}">
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="20">
+                    <StackPanel Spacing="0">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Show Dock" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="App launcher, bottom center" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding DockEnabled}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Magnification" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="Icons grow on hover" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding DockMagnification}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Auto-dim" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="Fade when mouse is away" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding DockAutoHide}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                            <Slider Value="{Binding DockIconSize}" Minimum="32" Maximum="72" TickFrequency="4"
+                                    IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding DockIconSize, StringFormat='{}{0}px'}"
+                                       FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="20">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Pinned apps" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                        <ItemsControl ItemsSource="{Binding PinnedApps}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="services:DockApp">
+                                    <Border BorderBrush="#14FFFFFF" BorderThickness="0,0,0,1" Padding="12,8" CornerRadius="4">
+                                        <Grid ColumnDefinitions="*,Auto,Auto">
+                                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextBrush}"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                <TextBlock Text="{Binding ExePath}" FontSize="9" FontFamily="Consolas"
+                                                           Foreground="{DynamicResource TextMutedBrush}"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Classes="pill pillGhost" Content="Run"
+                                                    Padding="12,5" FontSize="10" Margin="0,0,8,0"
+                                                    Command="{Binding ((vm:AppearancePacksViewModel)DataContext).LaunchPinnedCommand,
+                                                        RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"/>
+                                            <Button Grid.Column="2" Classes="pill pillGhost" Padding="0" Width="34" Height="34"
+                                                    CornerRadius="17"
+                                                    Command="{Binding ((vm:AppearancePacksViewModel)DataContext).RemovePinnedCommand,
+                                                        RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}">
+                                                <Path Data="M6 6l12 12M18 6L6 18"
+                                                      Stroke="{DynamicResource TextMutedBrush}"
+                                                      StrokeThickness="2" Width="11" Height="11"
+                                                      Stretch="Uniform"/>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox Text="{Binding NewPinnedPath}" Watermark="C:\…\app.exe"
+                                     Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                     Foreground="{DynamicResource TextBrush}" Padding="14,10" Margin="0,0,10,0"
+                                     FontFamily="Consolas" FontSize="10"/>
+                            <Button Grid.Column="1" Classes="pill pillGlass" Content="Browse…"
+                                    Command="{Binding BrowsePinnedCommand}"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <ComboBox ItemsSource="{Binding RunningApps}" SelectedItem="{Binding SelectedRunning}"
+                                      Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                      Foreground="{DynamicResource TextBrush}" Padding="14,10" Margin="0,0,10,0"
+                                      PlaceholderText="Running app…">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="services:DockApp">
+                                        <TextBlock Text="{Binding Name}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <Button Grid.Column="1" Classes="pill pillGlass" Content="Pin running"
+                                    Command="{Binding AddRunningCommand}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ══════ WIDGETS TAB ══════ -->
+            <StackPanel Spacing="12" IsVisible="{Binding IsWidgetsTab}">
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="20">
+                    <StackPanel Spacing="0">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Show widgets" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="Floating desktop overlays, top right" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding WidgetsEnabled}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                            <TextBlock Text="Clock" FontSize="12" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowClock}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                            <TextBlock Text="System (CPU / RAM)" FontSize="12" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowSystem}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                            <TextBlock Text="Weather" FontSize="12" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowWeather}"/>
+                        </Grid>
+                        <Border Height="1" Background="#14FFFFFF" Margin="0,6"/>
+                        <Grid ColumnDefinitions="*,*" Margin="0,6,0,0">
+                            <TextBox Text="{Binding City}" Watermark="City"
+                                     Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                     Foreground="{DynamicResource TextBrush}" Padding="14,10" Margin="0,0,8,0"/>
+                            <Grid Grid.Column="1" ColumnDefinitions="*,Auto">
+                                <Slider Value="{Binding WeatherInterval}" Minimum="60" Maximum="3600"
+                                        VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="1" Text="{Binding WeatherInterval, StringFormat='{}{0}s'}"
+                                           FontSize="10" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <TextBlock Text="Tip: drag widgets by any card to move them."
+                           FontSize="11" Foreground="{DynamicResource TextMutedBrush}"/>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

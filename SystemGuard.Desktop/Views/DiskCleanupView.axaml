@@ -1,0 +1,479 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:services="using:SystemGuard.Desktop.Services"
+             x:Class="SystemGuard.Desktop.Views.DiskCleanupView"
+             x:DataType="vm:DiskCleanupViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.pill">
+            <Setter Property="Padding" Value="20,12"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.pillPrimary">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BgBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.pillGlass">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Button.pillGhost">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Button.pill:pointerover">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style Selector="Button.pill:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+        <Style Selector="Button.segment">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="RenderTransform" Value="scale(1)"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.segment:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.94)"/>
+        </Style>
+        <Style Selector="Border.rowGlass:pointerover">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="0" Margin="28,22,28,22">
+
+            <!-- ══════ Header ══════ -->
+            <StackPanel Spacing="2" Margin="0,0,0,18">
+                <TextBlock Text="Storage Cleanup" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
+                <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource TextMutedBrush}"
+                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+            </StackPanel>
+
+            <!-- ══════ Hero glass card ══════ -->
+            <Panel Margin="0,0,0,18">
+                <Border CornerRadius="26" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 10 30 -8 #59000000" Padding="26,22">
+                    <Grid ColumnDefinitions="*,Auto,*,Auto,*">
+                        <StackPanel Grid.Column="0" Spacing="4" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding TotalCleanupSize, Converter={StaticResource BytesToMBConverter}}"
+                                       FontWeight="Bold" FontSize="28" Foreground="{DynamicResource AccentBrush}"
+                                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                            <TextBlock Text="Ready to clean" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <Rectangle Grid.Column="1" Width="1" Fill="#1FFFFFFF" Margin="14,0"/>
+                        <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding TotalDuplicateWaste, Converter={StaticResource BytesToMBConverter}}"
+                                       FontWeight="Bold" FontSize="28" Foreground="{DynamicResource AccentLightBrush}"
+                                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                            <TextBlock Text="Duplicate waste" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <Rectangle Grid.Column="3" Width="1" Fill="#1FFFFFFF" Margin="14,0"/>
+                        <StackPanel Grid.Column="4" Spacing="4" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding LargeFiles.Count}" FontWeight="Bold" FontSize="28"
+                                       Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Large files" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border CornerRadius="26" IsHitTestVisible="False">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,55%">
+                            <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                            <GradientStop Color="#00FFFFFF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Panel>
+
+            <!-- ══════ Droplet tabs: Cleanup / Tools / Privacy / Uninstall ══════ -->
+            <!-- Та же капля, что в референсе: фиксированные сегменты 132px, текст не вылезает -->
+            <Border Width="536" Height="44" CornerRadius="22" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1" ClipToBounds="True" Padding="4"
+                    HorizontalAlignment="Left" Margin="0,0,0,16">
+                <Panel Width="528" Height="36" ClipToBounds="True">
+                    <Border x:Name="TabIndicator" Width="132" Height="36" CornerRadius="18"
+                            Background="{DynamicResource AccentBrush}"
+                            HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <Border.Transitions>
+                            <Transitions>
+                                <ThicknessTransition Property="Margin" Duration="0:0:0.5" Easing="CubicEaseInOut"/>
+                            </Transitions>
+                        </Border.Transitions>
+                    </Border>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Width="132" Height="36" Classes="segment" Click="CleanupTab_Click">
+                            <TextBlock Text="Cleanup" FontSize="11.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                       Foreground="{Binding IsCleanupTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                        </Button>
+                        <Button Width="132" Height="36" Classes="segment" Click="ToolsTab_Click">
+                            <TextBlock Text="Tools" FontSize="11.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                       Foreground="{Binding IsToolsTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                        </Button>
+                        <Button Width="132" Height="36" Classes="segment" Click="PrivacyTab_Click">
+                            <TextBlock Text="Privacy" FontSize="11.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                       Foreground="{Binding IsPrivacyTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                        </Button>
+                        <Button Width="132" Height="36" Classes="segment" Click="UninstallTab_Click">
+                            <TextBlock Text="Uninstall" FontSize="11.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                       Foreground="{Binding IsUninstallTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                        </Button>
+                    </StackPanel>
+                </Panel>
+            </Border>
+
+            <!-- ══════ CLEANUP TAB ══════ -->
+            <StackPanel Spacing="12" IsVisible="{Binding IsCleanupTab}">
+                <WrapPanel>
+                    <Button Classes="pill pillPrimary" Content="Scan" Command="{Binding ScanCleanupCommand}"
+                            IsEnabled="{Binding !IsScanning}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillGlass" Content="Clean" Command="{Binding CleanCommand}"
+                            IsEnabled="{Binding !IsCleaning}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillGhost" Content="Select All" Command="{Binding SelectAllCommand}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillGhost" Content="Deselect All" Command="{Binding DeselectAllCommand}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillGhost" Content="Empty Recycle Bin" Command="{Binding EmptyRecycleBinCommand}" Margin="0,0,10,10"/>
+                </WrapPanel>
+
+                <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="4" CornerRadius="2"
+                             Foreground="{DynamicResource AccentBrush}" Background="#14FFFFFF"
+                             IsVisible="{Binding IsScanning}"/>
+
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1" BoxShadow="0 8 24 -8 #4D000000" Padding="6"
+                        IsVisible="{Binding HasCleanupItems}">
+                    <StackPanel Spacing="0">
+                        <Grid ColumnDefinitions="*,Auto" Margin="16,12,16,8">
+                            <TextBlock Text="Cleanup items" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" FontSize="12" FontWeight="Bold"
+                                       Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"
+                                       Text="{Binding TotalCleanupSize, Converter={StaticResource BytesToMBConverter}}"/>
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding CleanupItems}" Margin="4,0,4,4">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="services:CleanupItem">
+                                    <Border BorderBrush="#14FFFFFF" BorderThickness="0,0,0,1" Padding="12,10" Classes="rowGlass" CornerRadius="4">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextBrush}"
+                                                           FontSize="12" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                <TextBlock Text="{Binding Path}" Foreground="{DynamicResource TextMutedBrush}"
+                                                           FontSize="9" FontFamily="Consolas"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" Foreground="{DynamicResource TextMutedBrush}"
+                                                       FontSize="11" VerticalAlignment="Center" Margin="12,0,0,0"
+                                                       Text="{Binding Size, Converter={StaticResource BytesToMBConverter}}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="Run Scan to find temporary files and caches."
+                           FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                           IsVisible="{Binding !HasCleanupItems}"/>
+            </StackPanel>
+
+            <!-- ══════ TOOLS TAB ══════ -->
+            <StackPanel Spacing="12" IsVisible="{Binding IsToolsTab}">
+                <WrapPanel>
+                    <Button Classes="pill pillGlass" Content="Analyze Folders" Command="{Binding AnalyzeFolderCommand}"
+                            IsEnabled="{Binding !IsScanning}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillGlass" Content="Large Files" Command="{Binding FindLargeFilesCommand}"
+                            IsEnabled="{Binding !IsScanning}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillGlass" Content="Duplicates" Command="{Binding FindDuplicatesCommand}"
+                            IsEnabled="{Binding !IsScanning}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillGlass" Content="Old Files" Command="{Binding FindOldFilesCommand}"
+                            IsEnabled="{Binding !IsScanning}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillGlass" Content="Clean Shaders" Command="{Binding CleanShadersCommand}"
+                            IsEnabled="{Binding !IsScanning}" Margin="0,0,10,10"/>
+                </WrapPanel>
+                <Grid ColumnDefinitions="*,*,Auto" Margin="0,0,0,4">
+                    <TextBox Text="{Binding SavesDir}" Watermark="Game saves folder…"
+                             Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
+                             Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontSize="11"/>
+                    <TextBox Grid.Column="1" Text="{Binding SavesBackupRoot}" Watermark="Backup root (optional)…"
+                             Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
+                             Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontSize="11"/>
+                    <Button Grid.Column="2" Classes="pill pillGlass" Content="Backup saves" Command="{Binding BackupSavesCommand}"/>
+                </Grid>
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,4">
+                    <TextBlock Text="Older than (days):" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <Slider Grid.Column="1" Value="{Binding OldFileDays}" Minimum="7" Maximum="365" TickFrequency="7" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Grid.Column="2" Text="{Binding OldFileDays, StringFormat='{}{0}d'}" FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                </Grid>
+                <Border CornerRadius="20" Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1" Padding="18" IsVisible="{Binding HasOldFiles}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="{Binding OldFiles.Count, StringFormat='Old files: {0}'}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                        <ItemsControl ItemsSource="{Binding OldFiles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="services:LargeFileInfo">
+                                    <Border BorderBrush="#14FFFFFF" BorderThickness="0,0,0,1" Padding="10,8" CornerRadius="4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Text="{Binding Path}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontFamily="Consolas" TextTrimming="CharacterEllipsis" MaxLines="1" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Size, Converter={StaticResource BytesToMBConverter}}" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+                <Border CornerRadius="20" Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1" Padding="18">
+                    <StackPanel Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBlock Text="Backups" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Classes="pill pillGlass" Content="Backup now" Command="{Binding CreateBackupCommand}" Margin="0,0,8,0"/>
+                            <Button Grid.Column="2" Classes="pill pillGhost" Content="Refresh" Command="{Binding RefreshBackupsCommand}"/>
+                        </Grid>
+                        <TextBlock Text="Auto: last 3 kept. Manual backups are never deleted." FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
+                        <ItemsControl ItemsSource="{Binding Backups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="services:BackupEntry">
+                                    <Border BorderBrush="#14FFFFFF" BorderThickness="0,0,0,1" Padding="10,8" CornerRadius="4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextBrush}" FontSize="11" FontFamily="Consolas" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                            <Button Grid.Column="1" Classes="pill pillGhost" Content="Restore" Padding="12,6" FontSize="10" Margin="12,0,0,0"
+                                                    Command="{Binding $parent[UserControl].((vm:DiskCleanupViewModel)DataContext).RestoreBackupCommand}" CommandParameter="{Binding}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="4" CornerRadius="2"
+                             Foreground="{DynamicResource AccentBrush}" Background="#14FFFFFF"
+                             IsVisible="{Binding IsScanning}"/>
+
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1" BoxShadow="0 8 24 -8 #4D000000" Padding="6"
+                        IsVisible="{Binding HasLargeFolders}">
+                    <StackPanel Spacing="0">
+                        <TextBlock Text="Large folders" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}" Margin="16,12,16,8"/>
+                        <ItemsControl ItemsSource="{Binding LargeFolders}" Margin="4,0,4,4">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="services:FolderSizeInfo">
+                                    <Border BorderBrush="#14FFFFFF" BorderThickness="0,0,0,1" Padding="12,10" Classes="rowGlass" CornerRadius="4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextBrush}"
+                                                           FontSize="12" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                <TextBlock Text="{Binding Path}" Foreground="{DynamicResource TextMutedBrush}"
+                                                           FontSize="9" FontFamily="Consolas"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Foreground="{DynamicResource AccentBrush}"
+                                                       FontSize="12" FontWeight="Bold" VerticalAlignment="Center" Margin="12,0,0,0"
+                                                       Text="{Binding Size, Converter={StaticResource BytesToMBConverter}}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1" BoxShadow="0 8 24 -8 #4D000000" Padding="6"
+                        IsVisible="{Binding HasLargeFiles}">
+                    <StackPanel Spacing="0">
+                        <TextBlock Text="Large files" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}" Margin="16,12,16,8"/>
+                        <ItemsControl ItemsSource="{Binding LargeFiles}" Margin="4,0,4,4">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="services:LargeFileInfo">
+                                    <Border BorderBrush="#14FFFFFF" BorderThickness="0,0,0,1" Padding="12,10" Classes="rowGlass" CornerRadius="4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextBrush}"
+                                                           FontSize="12" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                <TextBlock Text="{Binding Path}" Foreground="{DynamicResource TextMutedBrush}"
+                                                           FontSize="9" FontFamily="Consolas"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Foreground="{DynamicResource AccentLightBrush}"
+                                                       FontSize="12" FontWeight="Bold" VerticalAlignment="Center" Margin="12,0,0,0"
+                                                       Text="{Binding Size, Converter={StaticResource BytesToMBConverter}}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1" BoxShadow="0 8 24 -8 #4D000000" Padding="6"
+                        IsVisible="{Binding HasDuplicates}">
+                    <StackPanel Spacing="0">
+                        <Grid ColumnDefinitions="*,Auto" Margin="16,12,16,8">
+                            <TextBlock Text="Duplicates" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"
+                                       Text="{Binding TotalDuplicateWaste, Converter={StaticResource BytesToMBConverter}}"/>
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding Duplicates}" Margin="4,0,4,4">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="services:DuplicateFileGroup">
+                                    <Border BorderBrush="#14FFFFFF" BorderThickness="0,0,0,1" Padding="12,10" Classes="rowGlass" CornerRadius="4">
+                                        <StackPanel Spacing="6">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Foreground="{DynamicResource TextBrush}" FontSize="12" FontWeight="SemiBold"
+                                                           Text="{Binding Paths.Count, StringFormat='{}{0} identical files'}"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                <TextBlock Grid.Column="1" Foreground="{DynamicResource AccentBrush}" FontSize="11"
+                                                           VerticalAlignment="Center" Margin="12,0,0,0"
+                                                           Text="{Binding WastedSpace, Converter={StaticResource BytesToMBConverter}}"/>
+                                            </Grid>
+                                            <ItemsControl ItemsSource="{Binding Paths}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="x:String">
+                                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource TextMutedBrush}"
+                                                                   FontSize="9" FontFamily="Consolas"
+                                                                   TextTrimming="CharacterEllipsis" MaxLines="1" Margin="0,1"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ══════ PRIVACY TAB ══════ -->
+            <StackPanel Spacing="12" IsVisible="{Binding IsPrivacyTab}">
+                <WrapPanel>
+                    <Button Classes="pill pillGlass" Content="Select All" Command="{Binding SelectAllPrivacyCommand}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillGhost" Content="Deselect All" Command="{Binding DeselectAllPrivacyCommand}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillPrimary" Content="Clean Selected" Command="{Binding CleanCommand}"
+                            IsEnabled="{Binding !IsCleaning}" Margin="0,0,10,10"/>
+                </WrapPanel>
+
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1" BoxShadow="0 8 24 -8 #4D000000" Padding="6"
+                        IsVisible="{Binding HasPrivacyItems}">
+                    <StackPanel Spacing="0">
+                        <Grid ColumnDefinitions="*,Auto" Margin="16,12,16,8">
+                            <TextBlock Text="Browser traces" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" FontSize="12" FontWeight="Bold"
+                                       Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"
+                                       Text="{Binding TotalPrivacySize, Converter={StaticResource BytesToMBConverter}}"/>
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding PrivacyItems}" Margin="4,0,4,4">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="services:CleanupItem">
+                                    <Border BorderBrush="#14FFFFFF" BorderThickness="0,0,0,1" Padding="12,10" Classes="rowGlass" CornerRadius="4">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextBrush}"
+                                                           FontSize="12" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                <TextBlock Text="{Binding Path}" Foreground="{DynamicResource TextMutedBrush}"
+                                                           FontSize="9" FontFamily="Consolas"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" Foreground="{DynamicResource TextMutedBrush}"
+                                                       FontSize="11" VerticalAlignment="Center" Margin="12,0,0,0"
+                                                       Text="{Binding Size, Converter={StaticResource BytesToMBConverter}}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="No browser traces found. Run Scan in the Cleanup tab first."
+                           FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                           IsVisible="{Binding !HasPrivacyItems}"/>
+            </StackPanel>
+
+            <!-- ══════ UNINSTALL TAB — сводка остатков, полное удаление в пункте Uninstaller ══════ -->
+            <StackPanel Spacing="12" IsVisible="{Binding IsUninstallTab}">
+                <Panel>
+                    <Border CornerRadius="26" Background="{DynamicResource CardBrush}"
+                            BorderBrush="#1FFFFFFF" BorderThickness="1"
+                            BoxShadow="0 10 30 -8 #59000000" Padding="26,22">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="App leftovers" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="Duplicates and oversized files are usually leftovers of removed apps. For full program removal with registry and file traces use the Uninstaller menu."
+                                       FontSize="11" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+                            <Grid ColumnDefinitions="*,Auto,*,Auto,*" Margin="0,8,0,0">
+                                <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding Duplicates.Count}" FontWeight="Bold" FontSize="24"
+                                               Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Dup groups" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                <Rectangle Grid.Column="1" Width="1" Fill="#1FFFFFFF" Margin="14,0"/>
+                                <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding LargeFiles.Count}" FontWeight="Bold" FontSize="24"
+                                               Foreground="{DynamicResource AccentLightBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Large files" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                <Rectangle Grid.Column="3" Width="1" Fill="#1FFFFFFF" Margin="14,0"/>
+                                <StackPanel Grid.Column="4" Spacing="4" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding CleanupItems.Count}" FontWeight="Bold" FontSize="24"
+                                               Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Temp items" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Border CornerRadius="26" IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,55%">
+                                <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                                <GradientStop Color="#00FFFFFF" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                </Panel>
+                <WrapPanel>
+                    <Button Classes="pill pillGlass" Content="Find Duplicates" Command="{Binding FindDuplicatesCommand}"
+                            IsEnabled="{Binding !IsScanning}" Margin="0,0,10,10"/>
+                    <Button Classes="pill pillGlass" Content="Find Large Files" Command="{Binding FindLargeFilesCommand}"
+                            IsEnabled="{Binding !IsScanning}" Margin="0,0,10,10"/>
+                </WrapPanel>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

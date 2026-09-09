@@ -1,0 +1,218 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             x:Class="SystemGuard.Desktop.Views.LicenseView"
+             x:DataType="vm:LicenseViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.pill">
+            <Setter Property="Padding" Value="20,12"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.pillPrimary">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BgBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.pillGlass">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Button.pillGhost">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Button.pill:pointerover">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style Selector="Button.pill:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="14" Margin="0,0,0,8">
+
+            <!-- ── Status hero ───────────────────────────────────────────── -->
+            <Panel>
+                <Border CornerRadius="26" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 10 30 -8 #59000000" Padding="26,22">
+                    <StackPanel Spacing="12" HorizontalAlignment="Center">
+                        <Border CornerRadius="20" Padding="28,16" HorizontalAlignment="Center">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                    <GradientStop Color="{DynamicResource AccentColor}" Offset="0"/>
+                                    <GradientStop Color="{DynamicResource AccentLightColor}" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel Spacing="2" HorizontalAlignment="Center">
+                                <TextBlock Text="{Binding TierBadge}" FontSize="26" FontWeight="Black"
+                                           Foreground="{DynamicResource BgBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="LICENSE" FontSize="9" Foreground="{DynamicResource BgBrush}"
+                                           Opacity="0.6" LetterSpacing="2" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="{Binding StatusText}" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{Binding StatusColor}"
+                                   HorizontalAlignment="Center"/>
+
+                        <StackPanel HorizontalAlignment="Center" Spacing="2"
+                                    IsVisible="{Binding IsLicenseActive}">
+                            <TextBlock FontSize="40" FontWeight="Black" Foreground="{DynamicResource AccentBrush}"
+                                       HorizontalAlignment="Center" Text="{Binding DaysLeft}"/>
+                            <TextBlock Text="DAYS REMAINING" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"
+                                       LetterSpacing="1" HorizontalAlignment="Center"/>
+                        </StackPanel>
+
+                        <Border Background="#33FB7185" BorderBrush="{DynamicResource DangerBrush}" BorderThickness="1"
+                                CornerRadius="14" Padding="14,10"
+                                IsVisible="{Binding IsExpired}">
+                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                <Path Data="M12 2L1 21h22L12 2zm0 6l7 12H5l7-12zm-1 4v4h2v-4h-2zm0 5v2h2v-2h-2z"
+                                      Fill="{DynamicResource DangerBrush}" Width="14" Height="14" Stretch="Uniform"/>
+                                <TextBlock Text="License expired. Renew to restore Pro features."
+                                           FontSize="11" Foreground="{DynamicResource DangerBrush}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock FontSize="9" Foreground="{DynamicResource TextMutedBrush}"
+                                   HorizontalAlignment="Center" FontFamily="Consolas"
+                                   Text="{Binding MachineId, StringFormat='Machine ID: {0}'}"/>
+                        <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentLightBrush}"
+                                   HorizontalAlignment="Center"
+                                   Text="{Binding PlanText, StringFormat='Plan: {0}'}"
+                                   IsVisible="{Binding IsLicenseActive}"/>
+                    </StackPanel>
+                </Border>
+                <Border CornerRadius="26" IsHitTestVisible="False">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
+                            <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                            <GradientStop Color="#00FFFFFF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Panel>
+
+            <!-- Plans -->
+            <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
+                    BorderThickness="1" CornerRadius="22" Padding="22"
+                    BoxShadow="0 8 24 -8 #4D000000">
+                <StackPanel Spacing="0">
+                    <TextBlock Text="PLANS" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"
+                               LetterSpacing="1" Margin="0,0,0,8"/>
+                    <Grid ColumnDefinitions="*,*,*,*" >
+                        <StackPanel Spacing="2" HorizontalAlignment="Center">
+                            <TextBlock Text="Monthly" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="300 stars" FontSize="10" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Center">
+                            <TextBlock Text="Half-Year" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="1000 stars" FontSize="10" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Center">
+                            <TextBlock Text="Yearly" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="1800 stars" FontSize="10" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3" Spacing="2" HorizontalAlignment="Center">
+                            <TextBlock Text="Lifetime" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="3000 stars" FontSize="10" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Trial -->
+            <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
+                    BorderThickness="1" CornerRadius="22" Padding="22"
+                    BoxShadow="0 8 24 -8 #4D000000"
+                    IsVisible="{Binding CanActivateTrial}">                <StackPanel Spacing="10">
+                    <TextBlock Text="Free Trial" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextBrush}"/>
+                    <TextBlock Text="14 days of full Pro access, bound to this PC."
+                               FontSize="11" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+                    <Button Classes="pill pillGlass" Content="Start 14-day trial"
+                            HorizontalAlignment="Left"
+                            Command="{Binding ActivateTrialCommand}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Activation -->
+            <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
+                    BorderThickness="1" CornerRadius="22" Padding="22"
+                    BoxShadow="0 8 24 -8 #4D000000">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Activate Pro" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextBrush}"/>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Text="{Binding ActivationKey}" Watermark="SG-PRO-…"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                 Foreground="{DynamicResource TextBrush}" Padding="16,11" Margin="0,0,10,0"
+                                 FontFamily="Consolas" FontSize="11"/>
+                        <Button Grid.Column="1" Classes="pill pillPrimary" Content="Activate"
+                                Command="{Binding ActivateProCommand}"
+                                IsEnabled="{Binding !IsActivating}"/>
+                    </Grid>
+                    <TextBlock Text="{Binding ActivationMessage}" FontSize="11" TextWrapping="Wrap"
+                               Foreground="{Binding ActivationMessageColor}"
+                               IsVisible="{Binding ActivationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    <WrapPanel>
+                        <Button Classes="pill pillGhost" Content="Deactivate"
+                                Command="{Binding DeactivateCommand}"
+                                IsVisible="{Binding IsLicenseActive}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGlass" Content="Get key in Telegram"
+                                Command="{Binding OpenTelegramBotCommand}" Margin="0,0,8,8"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Feature table -->
+            <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
+                    BorderThickness="1" CornerRadius="22" Padding="22"
+                    BoxShadow="0 8 24 -8 #4D000000">
+                <StackPanel Spacing="0">
+                    <Grid ColumnDefinitions="*,60,60,60" Margin="0,0,0,8">
+                        <TextBlock Text="FEATURES" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"
+                                   LetterSpacing="1" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="FREE" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="PRO" FontSize="9" Foreground="{DynamicResource AccentBrush}"
+                                   FontWeight="Bold" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="3" Text="ENT" FontSize="9" Foreground="{DynamicResource AccentLightBrush}"
+                                   FontWeight="Bold" HorizontalAlignment="Center"/>
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding FeatureRows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FeatureRow">
+                                <Border BorderBrush="#14FFFFFF" BorderThickness="0,0,0,1" Padding="0,9">
+                                    <Grid ColumnDefinitions="*,60,60,60">
+                                        <TextBlock Text="{Binding Name}" FontSize="11"
+                                                   Foreground="{DynamicResource TextBrush}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding FreeText}" FontSize="11"
+                                                   Foreground="{Binding FreeColor}" HorizontalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ProText}" FontSize="11"
+                                                   Foreground="{Binding ProColor}" HorizontalAlignment="Center"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding EntText}" FontSize="11"
+                                                   Foreground="{Binding EntColor}" HorizontalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,0 +1,31 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SystemGuard.Desktop.Views.DockWindow"
+        Title="SystemGuard Dock"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        SystemDecorations="None"
+        ShowInTaskbar="False"
+        Topmost="True"
+        CanResize="False"
+        ShowActivated="False"
+        SizeToContent="WidthAndHeight">
+
+    <Border x:Name="DockBar"
+            CornerRadius="24"
+            BorderBrush="#33FFFFFF" BorderThickness="1"
+            Padding="12,10" Margin="0,0,0,8"
+            BoxShadow="0 10 30 -8 #59000000">
+        <Border.Background>
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                <GradientStop Color="#3DFFFFFF" Offset="0"/>
+                <GradientStop Color="#14FFFFFF" Offset="0.35"/>
+                <GradientStop Color="#0A0C0A15" Offset="1"/>
+            </LinearGradientBrush>
+        </Border.Background>
+        <StackPanel x:Name="DockItems" Orientation="Horizontal" Spacing="6"/>
+    </Border>
+</Window>

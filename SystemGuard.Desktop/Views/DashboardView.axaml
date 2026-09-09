@@ -1,0 +1,324 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:models="using:SystemGuard.Desktop.Models"
+             xmlns:lvc="using:LiveChartsCore.SkiaSharpView.Avalonia"
+             x:Class="SystemGuard.Desktop.Views.DashboardView"
+             x:DataType="vm:DashboardViewModel">
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" Background="Transparent">
+        <StackPanel Spacing="14" Margin="0,0,0,8">
+
+            <!-- ── History / Export / Quick actions ──────────────────────────── -->
+            <Border CornerRadius="20" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1" Padding="16,12">
+                <StackPanel Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="24h" Command="{Binding SelectHistoryRangeCommand}" CommandParameter="24h"
+                                Background="{Binding Is24h, Converter={StaticResource BoolToAccentBrushConverter}}"
+                                Foreground="{Binding Is24h, Converter={StaticResource BoolToForegroundConverter}}"
+                                Padding="16,8" CornerRadius="14" FontSize="11" FontWeight="SemiBold"/>
+                        <Button Content="7d" Command="{Binding SelectHistoryRangeCommand}" CommandParameter="7d"
+                                Background="{Binding Is7d, Converter={StaticResource BoolToAccentBrushConverter}}"
+                                Foreground="{Binding Is7d, Converter={StaticResource BoolToForegroundConverter}}"
+                                Padding="16,8" CornerRadius="14" FontSize="11" FontWeight="SemiBold"/>
+                        <Button Content="30d" Command="{Binding SelectHistoryRangeCommand}" CommandParameter="30d"
+                                Background="{Binding Is30d, Converter={StaticResource BoolToAccentBrushConverter}}"
+                                Foreground="{Binding Is30d, Converter={StaticResource BoolToForegroundConverter}}"
+                                Padding="16,8" CornerRadius="14" FontSize="11" FontWeight="SemiBold"/>
+                        <Button Content="Export CSV" Command="{Binding ExportCsvCommand}" Padding="16,8" CornerRadius="14" FontSize="11" Background="#14FFFFFF" Foreground="{DynamicResource TextBrush}" BorderThickness="0"/>
+                        <Button Content="Export JSON" Command="{Binding ExportJsonCommand}" Padding="16,8" CornerRadius="14" FontSize="11" Background="#14FFFFFF" Foreground="{DynamicResource TextBrush}" BorderThickness="0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Free memory" Command="{Binding FreeMemoryCommand}" Padding="14,7" CornerRadius="14" FontSize="11" Background="#14FFFFFF" Foreground="{DynamicResource AccentBrush}" BorderThickness="0"/>
+                        <Button Content="Flush DNS" Command="{Binding FlushDnsCommand}" Padding="14,7" CornerRadius="14" FontSize="11" Background="#14FFFFFF" Foreground="{DynamicResource AccentBrush}" BorderThickness="0"/>
+                        <Button Content="Copy summary" Command="{Binding CopySummaryCommand}" Padding="14,7" CornerRadius="14" FontSize="11" Background="#14FFFFFF" Foreground="{DynamicResource AccentBrush}" BorderThickness="0"/>
+                        <TextBlock Text="{Binding StatusText}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                    </StackPanel>
+                    <ItemsControl ItemsSource="{Binding AlertsList}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#14FFFFFF" CornerRadius="12" Padding="12,8" Margin="0,2" BorderBrush="{DynamicResource WarningBrush}" BorderThickness="1">
+                                    <TextBlock Text="{Binding Message}" FontSize="11" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- ── CPU + GPU ───────────────────────────────────────────────── -->
+            <Grid ColumnDefinitions="*,*">
+
+                <!-- CPU Card -->
+                <Panel Grid.Column="0" Margin="0,0,7,0">
+                    <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                            BorderBrush="#1FFFFFFF" BorderThickness="1"
+                            BoxShadow="0 10 30 -8 #59000000" Padding="22">
+                        <StackPanel Spacing="14">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding CpuName}" FontSize="14" FontWeight="Bold"
+                                           Foreground="{DynamicResource TextBrush}" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                <TextBlock Text="PROCESSOR" FontSize="9" Foreground="{DynamicResource AccentBrush}" LetterSpacing="2"/>
+                            </StackPanel>
+
+                            <Grid ColumnDefinitions="*,*,*,*">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="LOAD" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock FontSize="28" FontWeight="Black" Foreground="{DynamicResource AccentBrush}" Text="{Binding CpuLoad, StringFormat='{}{0:F0}'}"/>
+                                    <TextBlock Text="%" FontSize="11" Foreground="{DynamicResource AccentLightBrush}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock Text="TEMP" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock FontSize="28" FontWeight="Black" Foreground="{DynamicResource TextBrush}" Text="{Binding CpuTemperature, StringFormat='{}{0:F0}'}"/>
+                                    <TextBlock Text="°C" FontSize="11" Foreground="{DynamicResource AccentLightBrush}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="2">
+                                    <TextBlock Text="CLOCK" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock FontSize="24" FontWeight="Black" Foreground="{DynamicResource TextBrush}" Text="{Binding CpuClock, StringFormat='{}{0:F2}'}"/>
+                                    <TextBlock Text="GHz" FontSize="10" Foreground="{DynamicResource AccentLightBrush}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" Spacing="2">
+                                    <TextBlock Text="POWER" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock FontSize="24" FontWeight="Black" Foreground="{DynamicResource TextBrush}" Text="{Binding CpuPower, StringFormat='{}{0:F0}'}"/>
+                                    <TextBlock Text="W" FontSize="10" Foreground="{DynamicResource AccentLightBrush}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <ProgressBar Value="{Binding CpuLoad}" Minimum="0" Maximum="100" Height="4" CornerRadius="2"
+                                         Foreground="{DynamicResource AccentBrush}" Background="#14FFFFFF"/>
+
+                            <Border Height="110" CornerRadius="14" ClipToBounds="True" Background="#0AFFFFFF">
+                                <lvc:CartesianChart Series="{Binding CpuSeries}" XAxes="{Binding XAxes}" YAxes="{Binding YAxes}" TooltipPosition="Hidden"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <Border CornerRadius="24" IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
+                                <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                                <GradientStop Color="#00FFFFFF" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                </Panel>
+
+                <!-- GPU Card -->
+                <Panel Grid.Column="1" Margin="7,0,0,0">
+                    <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                            BorderBrush="#1FFFFFFF" BorderThickness="1"
+                            BoxShadow="0 10 30 -8 #59000000" Padding="22">
+                        <StackPanel Spacing="14">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding GpuName}" FontSize="14" FontWeight="Bold"
+                                           Foreground="{DynamicResource TextBrush}" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                <TextBlock Text="GRAPHICS" FontSize="9" Foreground="{DynamicResource AccentBrush}" LetterSpacing="2"/>
+                            </StackPanel>
+
+                            <Grid ColumnDefinitions="*,*,*">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="LOAD" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock FontSize="28" FontWeight="Black" Foreground="{DynamicResource AccentBrush}" Text="{Binding GpuLoad, StringFormat='{}{0:F0}'}"/>
+                                    <TextBlock Text="%" FontSize="11" Foreground="{DynamicResource AccentLightBrush}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock Text="TEMP" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock FontSize="28" FontWeight="Black" Foreground="{DynamicResource TextBrush}" Text="{Binding GpuTemperature, StringFormat='{}{0:F0}'}"/>
+                                    <TextBlock Text="°C" FontSize="11" Foreground="{DynamicResource AccentLightBrush}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="2">
+                                    <TextBlock Text="VRAM" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    <TextBlock FontSize="15" FontWeight="Black" Foreground="{DynamicResource TextBrush}" Text="{Binding GpuMemoryText}"
+                                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <ProgressBar Value="{Binding GpuLoad}" Minimum="0" Maximum="100" Height="4" CornerRadius="2"
+                                         Foreground="{DynamicResource AccentBrush}" Background="#14FFFFFF"/>
+
+                            <Border Height="110" CornerRadius="14" ClipToBounds="True" Background="#0AFFFFFF">
+                                <lvc:CartesianChart Series="{Binding GpuSeries}" XAxes="{Binding XAxes}" YAxes="{Binding YAxes}" TooltipPosition="Hidden"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <Border CornerRadius="24" IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
+                                <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                                <GradientStop Color="#00FFFFFF" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                </Panel>
+            </Grid>
+
+            <!-- ── RAM + Network ───────────────────────────────────────────── -->
+            <Grid ColumnDefinitions="*,*">
+
+                <!-- RAM Card -->
+                <Panel Grid.Column="0" Margin="0,0,7,0">
+                    <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                            BorderBrush="#1FFFFFFF" BorderThickness="1"
+                            BoxShadow="0 10 30 -8 #59000000" Padding="22">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="MEMORY" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="USED" FontSize="9" Foreground="{DynamicResource AccentBrush}"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock FontSize="36" FontWeight="Black" Foreground="{DynamicResource TextBrush}" Text="{Binding MemoryUsedGb, StringFormat='{}{0:F1}'}"/>
+                                        <TextBlock Text="GB" FontSize="14" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Bottom" Margin="0,0,0,6"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding MemoryTotalGb, StringFormat='of {0:F1} GB'}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" FontSize="22" FontWeight="Black" Foreground="{DynamicResource AccentLightBrush}" VerticalAlignment="Center" Text="{Binding MemoryLoadPercent, StringFormat='{}{0:F0}%'}"/>
+                            </Grid>
+                            <ProgressBar Value="{Binding MemoryLoadPercent}" Minimum="0" Maximum="100" Height="4" CornerRadius="2"
+                                         Foreground="{DynamicResource AccentBrush}" Background="#14FFFFFF"/>
+                            <Border Height="110" CornerRadius="14" ClipToBounds="True" Background="#0AFFFFFF">
+                                <lvc:CartesianChart Series="{Binding RamSeries}" XAxes="{Binding XAxes}" YAxes="{Binding YAxes}" TooltipPosition="Hidden"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <Border CornerRadius="24" IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
+                                <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                                <GradientStop Color="#00FFFFFF" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                </Panel>
+
+                <!-- Network Card -->
+                <Panel Grid.Column="1" Margin="7,0,0,0">
+                    <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                            BorderBrush="#1FFFFFFF" BorderThickness="1"
+                            BoxShadow="0 10 30 -8 #59000000" Padding="22">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="NETWORK" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
+                            <Grid ColumnDefinitions="*,*">
+                                <StackPanel Spacing="6">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Data="M12 4v12m0 0l-5-5m5 5l5-5" Stroke="{DynamicResource TextMutedBrush}"
+                                              StrokeThickness="2" Width="10" Height="10" Stretch="Uniform"/>
+                                        <TextBlock Text="DOWNLOAD" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    </StackPanel>
+                                    <TextBlock FontSize="24" FontWeight="Black" Foreground="{DynamicResource AccentLightBrush}" Text="{Binding NetworkDownloadMbps, StringFormat='{}{0:F2}'}"/>
+                                    <TextBlock Text="Mbps" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="6">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Data="M12 20V8m0 0l-5 5m5-5l5 5" Stroke="{DynamicResource TextMutedBrush}"
+                                              StrokeThickness="2" Width="10" Height="10" Stretch="Uniform"/>
+                                        <TextBlock Text="UPLOAD" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    </StackPanel>
+                                    <TextBlock FontSize="24" FontWeight="Black" Foreground="{DynamicResource AccentLightBrush}" Text="{Binding NetworkUploadMbps, StringFormat='{}{0:F2}'}"/>
+                                    <TextBlock Text="Mbps" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
+                                </StackPanel>
+                            </Grid>
+                            <Border Height="110" CornerRadius="14" ClipToBounds="True" Background="#0AFFFFFF">
+                                <lvc:CartesianChart Series="{Binding NetworkSeries}" XAxes="{Binding XAxes}" YAxes="{Binding NetworkYAxes}" TooltipPosition="Hidden"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <Border CornerRadius="24" IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
+                                <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                                <GradientStop Color="#00FFFFFF" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                </Panel>
+            </Grid>
+
+            <!-- ── System strip ──────────────────────────────────────────────── -->
+            <Panel>
+                <Border CornerRadius="20" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="20,14">
+                    <Grid ColumnDefinitions="*,*,*">
+                        <StackPanel Spacing="2" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding UptimeText}" FontSize="18" FontWeight="Black"
+                                       Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="UPTIME" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"
+                                       HorizontalAlignment="Center" LetterSpacing="1"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding ProcessCount}" FontSize="18" FontWeight="Black"
+                                       Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="PROCESSES" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"
+                                       HorizontalAlignment="Center" LetterSpacing="1"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding OsName}" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" MaxLines="1" MaxWidth="260"/>
+                            <TextBlock Text="SYSTEM" FontSize="8" Foreground="{DynamicResource TextMutedBrush}"
+                                       HorizontalAlignment="Center" LetterSpacing="1"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border CornerRadius="20" IsHitTestVisible="False">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,50%">
+                            <GradientStop Color="#14FFFFFF" Offset="0"/>
+                            <GradientStop Color="#00FFFFFF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Panel>
+
+            <!-- ── Drives ──────────────────────────────────────────────────── -->
+            <Panel IsVisible="{Binding HasDrives}">
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 10 30 -8 #59000000" Padding="22">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="STORAGE" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
+                        <ItemsControl ItemsSource="{Binding Drives}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:StorageDriveViewModel">
+                                    <Border Background="#14FFFFFF" BorderBrush="#1FFFFFFF" BorderThickness="1"
+                                            CornerRadius="16" Padding="16,12" Margin="0,3">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Spacing="8">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextBrush}"
+                                                               FontSize="12" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                    <TextBlock Grid.Column="1" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Text="{Binding UsagePercent, StringFormat='{}{0:F0}%'}"/>
+                                                </Grid>
+                                                <ProgressBar Value="{Binding UsagePercent}" Minimum="0" Maximum="100" Height="4" CornerRadius="2"
+                                                             Foreground="{DynamicResource AccentBrush}" Background="#14FFFFFF"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                    <TextBlock FontSize="9" Foreground="{DynamicResource TextMutedBrush}" Text="{Binding UsedSpace, StringFormat='Used: {0:F1} GB'}"/>
+                                                    <TextBlock FontSize="9" Foreground="{DynamicResource TextMutedBrush}" Text="{Binding TotalSpace, StringFormat='Total: {0:F1} GB'}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="16,0,0,0" HorizontalAlignment="Right" Spacing="4">
+                                                <TextBlock FontSize="9" Foreground="{DynamicResource TextMutedBrush}" Text="{Binding Temperature, StringFormat='{}{0:F0} C'}"/>
+                                                <TextBlock FontSize="9" Foreground="{DynamicResource AccentLightBrush}" Text="{Binding ReadSpeed, StringFormat='R: {0:F0} KB/s'}"/>
+                                                <TextBlock FontSize="9" Foreground="{DynamicResource AccentBrush}" Text="{Binding WriteSpeed, StringFormat='W: {0:F0} KB/s'}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+                <Border CornerRadius="24" IsHitTestVisible="False">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
+                            <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                            <GradientStop Color="#00FFFFFF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Panel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,0 +1,191 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             x:Class="SystemGuard.Desktop.Views.TelegramView"
+             x:DataType="vm:TelegramViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.pill">
+            <Setter Property="Padding" Value="20,12"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.pillPrimary">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BgBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.pillGlass">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Button.pillGhost">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Button.pill:pointerover">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style Selector="Button.pill:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Configuration -->
+        <Panel Grid.Row="0" Margin="0,0,0,12">
+            <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    BoxShadow="0 10 30 -8 #59000000" Padding="22">
+                <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Telegram Bot" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                        <Border Grid.Column="1" CornerRadius="12" Padding="12,7"
+                                Background="#14FFFFFF" BorderBrush="#1FFFFFFF" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Width="8" Height="8" CornerRadius="4" VerticalAlignment="Center"
+                                        Background="{Binding IsConnected, Converter={StaticResource BoolToAccentBrushConverter}}"/>
+                                <TextBlock Text="{Binding IsConnected}" FontSize="10" FontWeight="Bold"
+                                           Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="BOT TOKEN" FontSize="9" Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
+                        <TextBox Text="{Binding BotToken}" Watermark="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                 Foreground="{DynamicResource TextBrush}" Padding="16,11" FontFamily="Consolas" FontSize="11"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="CHAT ID" FontSize="9" Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
+                        <TextBox Text="{Binding ChatId}" Watermark="123456789"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                 Foreground="{DynamicResource TextBrush}" Padding="16,11" FontFamily="Consolas" FontSize="11"/>
+                    </StackPanel>
+
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <TextBlock Text="{Binding StatusText}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                        <Button Grid.Column="1" Classes="pill pillGlass" Content="Save"
+                                Command="{Binding SaveConfigCommand}" Margin="0,0,8,0"/>
+                        <Button Grid.Column="2" Classes="pill pillPrimary" Content="Connect"
+                                Command="{Binding ConnectCommand}"/>
+                    </Grid>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="EXTRA USERS (admin = full control, otherwise read-only)" FontSize="9" Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBox Text="{Binding NewUserId}" Watermark="Chat ID"
+                                     Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                     Foreground="{DynamicResource TextBrush}" Padding="16,11" FontFamily="Consolas" FontSize="11" Margin="0,0,8,0"/>
+                            <CheckBox Grid.Column="1" IsChecked="{Binding NewUserAdmin}" Content="Admin" Foreground="{DynamicResource TextBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Button Grid.Column="2" Classes="pill pillGlass" Content="Add user" Command="{Binding AddUserCommand}"/>
+                        </Grid>
+                    </StackPanel>
+                    <TextBlock Text="/ip /ping /uptime /battery /free /users — 35 команд, опасные только для админов"
+                               FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                </StackPanel>
+            </Border>
+            <Border CornerRadius="24" IsHitTestVisible="False">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
+                        <GradientStop Color="#1FFFFFFF" Offset="0"/>
+                        <GradientStop Color="#00FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
+        </Panel>
+
+        <!-- Controls + Log -->
+        <Grid Grid.Row="1" RowDefinitions="Auto,*">
+
+            <Border Grid.Row="0" CornerRadius="22" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    BoxShadow="0 8 24 -8 #4D000000" Padding="20" Margin="0,0,0,12">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Quick Actions" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                    <WrapPanel>
+                        <Button Classes="pill pillGlass" Command="{Binding SendStatusCommand}"
+                                IsEnabled="{Binding IsConnected}" Margin="0,0,8,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Path Data="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" Fill="{DynamicResource AccentBrush}" Width="14" Height="14" Stretch="Uniform"/>
+                                <TextBlock Text="Send Status"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="pill pillGlass" Command="{Binding SendScreenshotCommand}"
+                                IsEnabled="{Binding IsConnected}" Margin="0,0,8,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Path Data="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" Fill="{DynamicResource AccentBrush}" Width="14" Height="14" Stretch="Uniform"/>
+                                <TextBlock Text="Screenshot"/>
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Text="{Binding CommandInput}" Watermark="Type CMD command…"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                 Foreground="{DynamicResource TextBrush}" Padding="16,11" Margin="0,0,8,0"
+                                 FontFamily="Consolas" FontSize="11"/>
+                        <Button Grid.Column="1" Classes="pill pillPrimary" Content="Execute"
+                                Command="{Binding ExecuteCmdCommand}"/>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Text="{Binding FilePathInput}" Watermark="PC file path to send…"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                 Foreground="{DynamicResource TextBrush}" Padding="16,11" Margin="0,0,8,0"
+                                 FontFamily="Consolas" FontSize="11"/>
+                        <Button Grid.Column="1" Classes="pill pillGlass" Content="Send file"
+                                Command="{Binding SendFileCommand}"
+                                IsEnabled="{Binding IsConnected}"/>
+                    </Grid>
+                    <WrapPanel>
+                        <Button Classes="pill pillGlass" Content="Start stream"
+                                Command="{Binding StartStreamCommand}"
+                                IsEnabled="{Binding IsConnected}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGhost" Content="Stop stream"
+                                Command="{Binding StopStreamCommand}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGlass" Content="Webcam snapshot"
+                                Command="{Binding SendCamCommand}"
+                                IsEnabled="{Binding IsConnected}" Margin="0,0,8,8"/>
+                    </WrapPanel>
+                    <TextBlock Text="/stream · /stop · /cam · /ls · /get — right in the chat"
+                               FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="1" CornerRadius="22" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    BoxShadow="0 8 24 -8 #4D000000" Padding="20">
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Log" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                        <Button Grid.Column="1" Classes="pill pillGhost" Content="Clear"
+                                Padding="12,6" FontSize="10" Command="{Binding ClearLogCommand}"/>
+                    </Grid>
+                    <ScrollViewer Height="280">
+                        <ItemsControl ItemsSource="{Binding LogMessages}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <TextBlock Text="{Binding}" Foreground="{DynamicResource TextMutedBrush}"
+                                               FontSize="10" FontFamily="Consolas"
+                                               TextWrapping="Wrap" Margin="0,2"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+
+        </Grid>
+
+    </Grid>
+</UserControl>

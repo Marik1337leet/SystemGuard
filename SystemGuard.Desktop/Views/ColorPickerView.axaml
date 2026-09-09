@@ -1,0 +1,396 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:services="using:SystemGuard.Desktop.Services"
+             x:Class="SystemGuard.Desktop.Views.ColorPickerView"
+             x:DataType="vm:ColorPickerViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.pill">
+            <Setter Property="Padding" Value="20,12"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.pillPrimary">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BgBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.pillGlass">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Button.pill:pointerover">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style Selector="Button.pill:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <Grid ColumnDefinitions="270,*" Margin="0,0,0,8">
+
+            <!-- ═══ LEFT — Color Slots + Presets ════════════════════════════ -->
+            <StackPanel Grid.Column="0" Spacing="12" Margin="0,0,12,0">
+
+                <Border Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        CornerRadius="22" Padding="18"
+                        BoxShadow="0 8 24 -8 #4D000000">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="APP COLORS" FontSize="11" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextBrush}" Margin="0,0,0,4"/>
+
+                        <ItemsControl ItemsSource="{Binding ColorSlots}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:AppColorSlot">
+                                    <Button Background="Transparent" BorderThickness="0"
+                                            Padding="0" Margin="0,2"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch"
+                                            Command="{Binding $parent[UserControl].((vm:ColorPickerViewModel)DataContext).SelectSlotCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Border CornerRadius="14" Padding="12,10"
+                                                BorderThickness="1" BorderBrush="#1FFFFFFF">
+                                            <Border.Background>
+                                                <SolidColorBrush Color="{DynamicResource CardAltColor}"
+                                                                 Opacity="{Binding IsSelected, Converter={StaticResource BoolToOpacityConverter}}"/>
+                                            </Border.Background>
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <Border Grid.Column="0"
+                                                        Width="30" Height="30"
+                                                        CornerRadius="10"
+                                                        Margin="0,0,12,0"
+                                                        BorderBrush="#33FFFFFF" BorderThickness="1">
+                                                    <Border.Background>
+                                                        <SolidColorBrush Color="{Binding Color}"/>
+                                                    </Border.Background>
+                                                </Border>
+
+                                                <StackPanel Grid.Column="1" Spacing="2"
+                                                            VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               FontSize="11" FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource TextBrush}"
+                                                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                    <TextBlock Text="{Binding HexColor}"
+                                                               FontSize="9"
+                                                               Foreground="{DynamicResource TextMutedBrush}"
+                                                               FontFamily="Consolas"/>
+                                                </StackPanel>
+
+                                                <Border Grid.Column="2"
+                                                        Width="7" Height="7" CornerRadius="4"
+                                                        Background="{DynamicResource AccentBrush}"
+                                                        VerticalAlignment="Center"
+                                                        IsVisible="{Binding IsSelected}"/>
+                                            </Grid>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        CornerRadius="22" Padding="18"
+                        BoxShadow="0 8 24 -8 #4D000000">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="PRESETS" FontSize="11" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextBrush}" Margin="0,0,0,4"/>
+                        <ItemsControl ItemsSource="{Binding Presets}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ColorPresetItem">
+                                    <Button Background="#14FFFFFF"
+                                            BorderBrush="#1FFFFFFF" BorderThickness="1"
+                                            CornerRadius="14" Padding="12,9" Margin="0,2"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Left"
+                                            Command="{Binding $parent[UserControl].((vm:ColorPickerViewModel)DataContext).ApplyPresetCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*">
+                                            <Border Grid.Column="0" Width="13" Height="13" CornerRadius="4" Margin="0,0,3,0">
+                                                <Border.Background><SolidColorBrush Color="{Binding AccentAsColor}"/></Border.Background>
+                                            </Border>
+                                            <Border Grid.Column="1" Width="13" Height="13" CornerRadius="4" Margin="0,0,3,0">
+                                                <Border.Background><SolidColorBrush Color="{Binding CardAsColor}"/></Border.Background>
+                                            </Border>
+                                            <Border Grid.Column="2" Width="13" Height="13" CornerRadius="4" Margin="0,0,3,0">
+                                                <Border.Background><SolidColorBrush Color="{Binding BgAsColor}"/></Border.Background>
+                                            </Border>
+                                            <Border Grid.Column="3" Width="13" Height="13" CornerRadius="4" Margin="0,0,10,0">
+                                                <Border.Background><SolidColorBrush Color="{Binding TextAsColor}"/></Border.Background>
+                                            </Border>
+                                            <TextBlock Grid.Column="4" Text="{Binding Name}"
+                                                       FontSize="11" FontWeight="Medium"
+                                                       Foreground="{DynamicResource TextBrush}"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        CornerRadius="22" Padding="18"
+                        BoxShadow="0 8 24 -8 #4D000000">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="MY PROFILES" FontSize="11" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextBrush}" Margin="0,0,0,4"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox Text="{Binding NewProfileName}" Watermark="Profile name…"
+                                     Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
+                                     Foreground="{DynamicResource TextBrush}" Padding="12,9"
+                                     Margin="0,0,8,0"/>
+                            <Button Grid.Column="1" Classes="pill pillPrimary" Content="Save"
+                                    Padding="16,9" Command="{Binding SaveProfileCommand}"/>
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding CustomProfiles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="services:AppTheme">
+                                    <Border Background="#14FFFFFF" BorderBrush="#1FFFFFFF" BorderThickness="1"
+                                            CornerRadius="14" Padding="10,8" Margin="0,2">
+                                        <Grid ColumnDefinitions="*,Auto,Auto">
+                                            <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                            <Button Grid.Column="1" Margin="6,0,0,0" Classes="pill pillGlass"
+                                                    Content="Apply" Padding="12,6" FontSize="10" VerticalAlignment="Center"
+                                                    Command="{Binding $parent[UserControl].((vm:ColorPickerViewModel)DataContext).ApplyCustomProfileCommand}"
+                                                    CommandParameter="{Binding}"/>
+                                            <Button Grid.Column="2" Margin="6,0,0,0" Background="Transparent" BorderThickness="0"
+                                                    Width="30" Height="30" VerticalAlignment="Center"
+                                                    Command="{Binding $parent[UserControl].((vm:ColorPickerViewModel)DataContext).DeleteProfileCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <Path Data="M6 6l12 12M18 6L6 18" Stroke="{DynamicResource DangerBrush}"
+                                                      StrokeThickness="2" Width="11" Height="11" Stretch="Uniform"/>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="No saved profiles yet — tune colors and press Save."
+                                   FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+
+            <!-- ═══ RIGHT — HSV Picker ═══════════════════════════════════════ -->
+            <StackPanel Grid.Column="1" Spacing="12">
+
+                <Panel>
+                    <Border Background="{DynamicResource CardBrush}"
+                            BorderBrush="#1FFFFFFF" BorderThickness="1"
+                            CornerRadius="20" Padding="18,14"
+                            BoxShadow="0 8 24 -8 #4D000000">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="EDITING" FontSize="9"
+                                           Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
+                                <TextBlock Text="{Binding SelectedSlot.DisplayName}"
+                                           FontSize="17" FontWeight="Black"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                            </StackPanel>
+                            <Border Grid.Column="1" Width="52" Height="52" CornerRadius="16"
+                                    BorderBrush="#33FFFFFF" BorderThickness="1">
+                                <Border.Background>
+                                    <SolidColorBrush Color="{Binding PreviewColor}"/>
+                                </Border.Background>
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <Border CornerRadius="20" IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,50%">
+                                <GradientStop Color="#14FFFFFF" Offset="0"/>
+                                <GradientStop Color="#00FFFFFF" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                </Panel>
+
+                <Border Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        CornerRadius="24" Padding="22"
+                        BoxShadow="0 10 30 -8 #59000000">
+                    <StackPanel Spacing="14">
+
+                        <Border x:Name="SvSquare"
+                                Height="220" CornerRadius="16"
+                                ClipToBounds="True"
+                                PointerPressed="SvSquare_PointerPressed"
+                                PointerMoved="SvSquare_PointerMoved"
+                                Cursor="Cross">
+                            <Panel>
+                                <Border CornerRadius="16">
+                                    <Border.Background>
+                                        <SolidColorBrush Color="{Binding SvSquareHueColor}"/>
+                                    </Border.Background>
+                                </Border>
+                                <Border CornerRadius="16">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                                            <GradientStop Color="#FFFFFFFF" Offset="0"/>
+                                            <GradientStop Color="#00FFFFFF" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Border CornerRadius="16">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                            <GradientStop Color="#00000000" Offset="0"/>
+                                            <GradientStop Color="#FF000000" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Canvas>
+                                    <Ellipse x:Name="SvCursor"
+                                             Width="16" Height="16"
+                                             Stroke="White" StrokeThickness="2"
+                                             Fill="Transparent"/>
+                                </Canvas>
+                            </Panel>
+                        </Border>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="HUE" FontSize="9"
+                                       Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
+                            <Border Height="20" CornerRadius="10" ClipToBounds="True">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                                        <GradientStop Color="#FFFF0000" Offset="0"/>
+                                        <GradientStop Color="#FFFFFF00" Offset="0.167"/>
+                                        <GradientStop Color="#FF00FF00" Offset="0.333"/>
+                                        <GradientStop Color="#FF00FFFF" Offset="0.5"/>
+                                        <GradientStop Color="#FF0000FF" Offset="0.667"/>
+                                        <GradientStop Color="#FFFF00FF" Offset="0.833"/>
+                                        <GradientStop Color="#FFFF0000" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Slider Value="{Binding Hue}" Minimum="0" Maximum="360"
+                                    Margin="0,-4,0,0"/>
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="*,*" >
+                            <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="SATURATION" FontSize="9"
+                                               Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Saturation, StringFormat={}{0:F0}}"
+                                               FontSize="9" Foreground="{DynamicResource AccentBrush}"/>
+                                </Grid>
+                                <Slider Value="{Binding Saturation}" Minimum="0" Maximum="100"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="BRIGHTNESS" FontSize="9"
+                                               Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Brightness, StringFormat={}{0:F0}}"
+                                               FontSize="9" Foreground="{DynamicResource AccentBrush}"/>
+                                </Grid>
+                                <Slider Value="{Binding Brightness}" Minimum="0" Maximum="100"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Border Grid.Column="0"
+                                    Width="42" Height="42" CornerRadius="12"
+                                    BorderBrush="#33FFFFFF" BorderThickness="1"
+                                    Margin="0,0,10,0">
+                                <Border.Background>
+                                    <SolidColorBrush Color="{Binding PreviewColor}"/>
+                                </Border.Background>
+                            </Border>
+                            <TextBox Grid.Column="1"
+                                     x:Name="HexInput"
+                                     Text="{Binding PreviewHex}"
+                                     Background="#14FFFFFF"
+                                     BorderThickness="0"
+                                     CornerRadius="14" Foreground="{DynamicResource TextBrush}"
+                                     Padding="16,11" FontFamily="Consolas"
+                                     KeyDown="HexInput_KeyDown"
+                                     Margin="0,0,10,0"/>
+                            <Button Grid.Column="2" Classes="pill pillPrimary" Content="Set"
+                                    Click="HexSet_Click"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,*,*">
+                            <Border Grid.Column="0" Background="#14FFFFFF"
+                                    CornerRadius="14" Padding="10,8" Margin="0,0,4,0">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="R" FontSize="8"
+                                               Foreground="{DynamicResource TextMutedBrush}"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding PreviewColor.R}"
+                                               FontSize="13" FontWeight="Bold"
+                                               Foreground="#FF6B6B"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="1" Background="#14FFFFFF"
+                                    CornerRadius="14" Padding="10,8" Margin="4,0">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="G" FontSize="8"
+                                               Foreground="{DynamicResource TextMutedBrush}"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding PreviewColor.G}"
+                                               FontSize="13" FontWeight="Bold"
+                                               Foreground="#6BFF6B"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Background="#14FFFFFF"
+                                    CornerRadius="14" Padding="10,8" Margin="4,0,0,0">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="B" FontSize="8"
+                                               Foreground="{DynamicResource TextMutedBrush}"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding PreviewColor.B}"
+                                               FontSize="13" FontWeight="Bold"
+                                               Foreground="#6B6BFF"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <Button Classes="pill pillPrimary" Content="APPLY ALL COLORS"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Padding="0,15" FontSize="13" FontWeight="Black"
+                            Command="{Binding ApplyCommand}"
+                            Margin="0,0,8,0"/>
+                    <Button Grid.Column="1" Classes="pill pillGlass" Content="Reset"
+                            Padding="22,15" Command="{Binding ResetCommand}"/>
+                </Grid>
+
+                <Border Background="{DynamicResource CardBrush}" CornerRadius="16" Padding="16,10"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        IsVisible="{Binding StatusText,
+                            Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="{Binding StatusText}"
+                               Foreground="{DynamicResource AccentBrush}" FontSize="11"/>
+                </Border>
+
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

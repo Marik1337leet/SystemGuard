@@ -1,0 +1,523 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:core="using:SystemGuard.Core.Interfaces"
+             xmlns:models="using:SystemGuard.Desktop.Models"
+             xmlns:services="using:SystemGuard.Desktop.Services"
+             x:Class="SystemGuard.Desktop.Views.GameModeView"
+             x:DataType="vm:GameModeViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.pill">
+            <Setter Property="Padding" Value="20,12"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.2"/>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.pillPrimary">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BgBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="RenderTransform" Value="scale(1)"/>
+        </Style>
+        <Style Selector="Button.pillGlass">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Button.pillGhost">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Button.pill:pointerover">
+            <Setter Property="Opacity" Value="0.88"/>
+        </Style>
+        <Style Selector="Button.pillPrimary:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.97)"/>
+        </Style>
+        <Style Selector="Button.pill:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+        <Style Selector="Button.chip">
+            <Setter Property="Background" Value="#0AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="14,9"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+        </Style>
+        <Style Selector="Button.chipOn">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BgBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <Grid ColumnDefinitions="360,*" Margin="0,0,0,8">
+
+            <!-- ═════════ LEFT: CONSOLE ═════════ -->
+            <StackPanel Grid.Column="0" Spacing="12" Margin="0,0,12,0">
+
+                <!-- Status console -->
+                <Panel>
+                    <Border CornerRadius="26" Padding="24,22"
+                            BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1.5"
+                            BoxShadow="0 12 36 -8 #59000000">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                <GradientStop Color="{DynamicResource CardColor}" Offset="0"/>
+                                <GradientStop Color="{DynamicResource CardAltColor}" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <StackPanel Spacing="12">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Border Width="10" Height="10" CornerRadius="5"
+                                        Background="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text="GAME MODE" FontSize="20" FontWeight="Black"
+                                           Foreground="{DynamicResource TextBrush}" LetterSpacing="1"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding StatusText}" FontSize="11"
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       TextWrapping="Wrap" MaxLines="2"/>
+                            <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0">
+                                <TextBlock Text="ACTIVE" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"
+                                           VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBlock Grid.Column="1" Text="{Binding ElapsedText}" FontSize="22" FontWeight="Black"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           IsVisible="{Binding IsGameModeActive}"/>
+                                <TextBlock Grid.Column="1" Text="OFF" FontSize="22" FontWeight="Black"
+                                           Foreground="{DynamicResource TextMutedBrush}"
+                                           IsVisible="{Binding !IsGameModeActive}"/>
+                            </Grid>
+                            <Button Classes="pill pillPrimary" Content="{Binding ToggleButtonText}"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                    Padding="0,15" FontSize="13"
+                                    Command="{Binding ToggleGameModeCommand}"/>
+                            <Grid ColumnDefinitions="*,*">
+                                <Button Classes="pill pillGlass" Margin="0,0,5,0" Command="{Binding LaunchGameCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center">
+                                        <Path Data="M8 5v14l11-7z" Fill="{DynamicResource AccentBrush}"
+                                              Width="12" Height="12" Stretch="Uniform"/>
+                                        <TextBlock Text="Launch" FontSize="12"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="1" Classes="pill pillGlass" Margin="5,0,0,0" Command="{Binding BoostNowCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center">
+                                        <Path Data="M13 2L4.5 13.5H11L9.5 22 19 10h-6.5L13 2z" Fill="{DynamicResource AccentBrush}"
+                                              Width="12" Height="12" Stretch="Uniform"/>
+                                        <TextBlock Text="Boost" FontSize="12"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <Button Classes="pill pillGhost" Content="Close browsers before match"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                    Command="{Binding CloseBrowsersCommand}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border CornerRadius="26" IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,45%">
+                                <GradientStop Color="#26FFFFFF" Offset="0"/>
+                                <GradientStop Color="#00FFFFFF" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                </Panel>
+
+                <!-- Live load -->
+                <Border CornerRadius="22" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="20">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="LIVE LOAD" FontSize="9" Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="2"/>
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <TextBlock Text="CPU" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                            <ProgressBar Grid.Column="1" Value="{Binding CpuNow}" Minimum="0" Maximum="100"
+                                         Height="6" CornerRadius="3" Margin="10,0"
+                                         Foreground="{DynamicResource AccentBrush}" Background="#14FFFFFF"/>
+                            <TextBlock Grid.Column="2" Text="{Binding CpuNow, StringFormat='{}{0:F0}%'}" FontSize="13"
+                                       FontWeight="Black" Foreground="{DynamicResource TextBrush}"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <TextBlock Text="RAM" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                            <ProgressBar Grid.Column="1" Value="{Binding RamNow}" Minimum="0" Maximum="100"
+                                         Height="6" CornerRadius="3" Margin="10,0"
+                                         Foreground="{DynamicResource AccentLightBrush}" Background="#14FFFFFF"/>
+                            <TextBlock Grid.Column="2" Text="{Binding RamNow, StringFormat='{}{0:F0}%'}" FontSize="13"
+                                       FontWeight="Black" Foreground="{DynamicResource TextBrush}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Report -->
+                <Border CornerRadius="22" Background="#14FFFFFF"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1" Padding="20"
+                        IsVisible="{Binding GameReport, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="LAST REPORT" FontSize="9" Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="2"/>
+                        <TextBlock Text="{Binding GameReport}" FontSize="11"
+                                   Foreground="{DynamicResource AccentLightBrush}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Elevation -->
+                <Border CornerRadius="22" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1" Padding="20">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ElevationLabel}" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="Some actions need admin rights" FontSize="9"
+                                       Foreground="{DynamicResource TextMutedBrush}"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="pill pillGhost" Content="Restart as admin"
+                                Padding="14,8" FontSize="10" VerticalAlignment="Center"
+                                Command="{Binding RestartAsAdminCommand}"
+                                IsVisible="{Binding !IsElevated}"/>
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <!-- ═════════ RIGHT: LIBRARY / PROFILES / POWER / TWEAKS ═════════ -->
+            <StackPanel Grid.Column="1" Spacing="12">
+
+                <!-- Library -->
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="22">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Game Library" FontSize="15" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="Steam · Epic · Start Menu — import as profile" FontSize="10"
+                                           Foreground="{DynamicResource TextMutedBrush}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="pill pillGlass" Content="Scan library"
+                                    Command="{Binding ScanLibraryCommand}"
+                                    IsEnabled="{Binding !IsScanningLibrary}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <TextBlock Text="Press Scan library to find Steam / Epic / Start Menu games."
+                                   FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                   IsVisible="{Binding !HasDetectedGames}"/>
+                        <ScrollViewer MaxHeight="150" IsVisible="{Binding HasDetectedGames}">
+                            <ItemsControl ItemsSource="{Binding DetectedGames}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="services:GameEntry">
+                                        <Border Background="#0AFFFFFF" CornerRadius="14" Padding="14,10" Margin="0,3"
+                                                BorderBrush="#1FFFFFFF" BorderThickness="1">
+                                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource TextBrush}"
+                                                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                    <TextBlock Text="{Binding ExePath}" FontSize="9" FontFamily="Consolas"
+                                                               Foreground="{DynamicResource TextMutedBrush}"
+                                                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                </StackPanel>
+                                                <Border Grid.Column="1" CornerRadius="8" Padding="8,4" Margin="10,0"
+                                                        Background="#14FFFFFF" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Source}" FontSize="9" FontWeight="Bold"
+                                                               Foreground="{DynamicResource AccentBrush}"/>
+                                                </Border>
+                                                <Button Grid.Column="2" Classes="pill pillPrimary" Content="Import"
+                                                        Padding="14,7" FontSize="10" VerticalAlignment="Center"
+                                                        Command="{Binding $parent[UserControl].((vm:GameModeViewModel)DataContext).ImportGameCommand}"
+                                                        CommandParameter="{Binding}"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+
+                <!-- Profiles -->
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="22">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Profiles" FontSize="15" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="{Binding SelectedProfile.Name, StringFormat='Active: {0}'}" FontSize="10"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <Button Classes="pill pillGlass" Padding="0" Width="36" Height="36"
+                                        CornerRadius="18" Command="{Binding AddProfileCommand}"
+                                        ToolTip.Tip="New profile">
+                                    <Path Data="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"
+                                          Fill="{DynamicResource AccentBrush}" Width="12" Height="12" Stretch="Uniform"/>
+                                </Button>
+                                <Button Classes="pill pillGhost" Padding="0" Width="36" Height="36"
+                                        CornerRadius="18" Command="{Binding DeleteProfileCommand}"
+                                        ToolTip.Tip="{Binding DeleteButtonText}">
+                                    <Path Data="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+                                          Fill="{DynamicResource TextMutedBrush}" Width="12" Height="12" Stretch="Uniform"/>
+                                </Button>
+                                <Button Classes="pill pillGlass" Content="Save" Command="{Binding SaveProfileCommand}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <ListBox ItemsSource="{Binding ProfileRows}" SelectedItem="{Binding SelectedRow}"
+                                 Background="Transparent" BorderThickness="0" MaxHeight="120">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProfileRowViewModel">
+                                    <Button Padding="14,10" CornerRadius="16" Margin="0,0,8,8"
+                                            Command="{Binding $parent[UserControl].((vm:GameModeViewModel)DataContext).SelectProfileCommand}"
+                                            CommandParameter="{Binding Profile}"
+                                            Background="{Binding IsSelected, Converter={StaticResource BoolToAccentBrushConverter}}"
+                                            BorderThickness="0">
+                                        <TextBlock Text="{Binding Profile.Name}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{Binding IsSelected, Converter={StaticResource BoolToForegroundConverter}}"
+                                                   TextTrimming="CharacterEllipsis" MaxLines="1" MaxWidth="150"/>
+                                    </Button>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBox Text="{Binding RenameText}" Watermark="Rename profile…"
+                                     Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                     Foreground="{DynamicResource TextBrush}" Padding="14,10" Margin="0,0,8,0"/>
+                            <Button Grid.Column="1" Classes="pill pillGhost" Content="Rename"
+                                    Command="{Binding RenameProfileCommand}" Margin="0,0,8,0"/>
+                            <Button Grid.Column="2" Classes="pill pillGlass" Content="Browse exe…"
+                                    Command="{Binding BrowseGameExeCommand}"/>
+                        </Grid>
+                        <TextBlock Text="{Binding SelectedProfile.GameExecutablePath}" FontSize="9" FontFamily="Consolas"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Power -->
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="22">
+                    <StackPanel Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Power Plan" FontSize="15" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="{Binding ActivePowerPlanName}" FontSize="10"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="pill pillGhost" Content="Refresh"
+                                    Command="{Binding RefreshPowerPlansCommand}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <ListBox ItemsSource="{Binding PowerPlans}" Background="Transparent"
+                                 BorderThickness="0" MaxHeight="130">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:PowerPlanInfo">
+                                    <Button Padding="14,10" CornerRadius="14" Margin="0,3"
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                            Command="{Binding $parent[UserControl].((vm:GameModeViewModel)DataContext).ApplyPowerPlanCommand}"
+                                            CommandParameter="{Binding}"
+                                            Background="#0AFFFFFF" BorderThickness="0">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                            <Border Grid.Column="1" CornerRadius="8" Padding="8,3"
+                                                    Background="{DynamicResource AccentBrush}"
+                                                    IsVisible="{Binding IsActive}">
+                                                <TextBlock Text="ACTIVE" FontSize="8" FontWeight="Bold"
+                                                           Foreground="{DynamicResource BgBrush}"/>
+                                            </Border>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </StackPanel>
+                </Border>
+
+                <!-- Profile switches -->
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="22">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Profile Switches" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}"/>
+                        <Grid ColumnDefinitions="*,*">
+                            <StackPanel Spacing="4" Margin="0,0,8,0">
+                                <CheckBox IsChecked="{Binding SelectedProfile.SetHighPriority}" Content="High CPU priority" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                                <CheckBox IsChecked="{Binding SelectedProfile.ClearRamBeforeLaunch}" Content="Clear RAM" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                                <CheckBox IsChecked="{Binding SelectedProfile.EnableHighPerformancePowerPlan}" Content="Performance plan" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                                <CheckBox IsChecked="{Binding SelectedProfile.DisableSysMain}" Content="Disable SysMain" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                                <CheckBox IsChecked="{Binding SelectedProfile.DisableWindowsUpdates}" Content="Disable updates" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <CheckBox IsChecked="{Binding SelectedProfile.DisableBackgroundApps}" Content="Close background" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                                <CheckBox IsChecked="{Binding SelectedProfile.DisableAnimations}" Content="No animations" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                                <CheckBox IsChecked="{Binding SelectedProfile.DisableNotifications}" Content="No notifications" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                                <CheckBox IsChecked="{Binding SelectedProfile.StopPrintSpooler}" Content="Stop spooler" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                                <CheckBox IsChecked="{Binding SelectedProfile.StopWindowsSearch}" Content="Stop search" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*">
+                            <StackPanel Spacing="4" Margin="0,0,8,0">
+                                <CheckBox IsChecked="{Binding SelectedProfile.StopBluetooth}" Content="Stop Bluetooth" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                                <CheckBox IsChecked="{Binding SelectedProfile.BlockWinKeys}" Content="Block Win keys" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                                <CheckBox IsChecked="{Binding SelectedProfile.BlockAltTab}" Content="Block Alt+Tab" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <CheckBox IsChecked="{Binding SelectedProfile.BlockAltF4}" Content="Block Alt+F4" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                                <CheckBox IsChecked="{Binding SelectedProfile.DisableGameBar}" Content="No Game Bar" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                                <CheckBox IsChecked="{Binding SelectedProfile.DisableGameDvr}" Content="No Game DVR" Foreground="{DynamicResource TextBrush}" FontSize="11"/>
+                            </StackPanel>
+                        </Grid>
+                        <CheckBox IsChecked="{Binding SelectedProfile.AutoRestoreOnGameExit}" Content="Auto-restore when game exits" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Keep / Kill lists -->
+                <Grid ColumnDefinitions="*,*">
+                    <Border CornerRadius="22" Background="#0AFFFFFF" Margin="0,0,6,0"
+                            BorderBrush="#1FFFFFFF" BorderThickness="1" Padding="18">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="KEEP RUNNING" FontSize="9" Foreground="{DynamicResource AccentBrush}" LetterSpacing="2"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBox Text="{Binding NewProcessToKeep}" Watermark="name"
+                                         Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1"
+                                         CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,9" Margin="0,0,8,0"/>
+                                <Button Grid.Column="1" Classes="pill pillPrimary" Content="Add"
+                                        Command="{Binding AddProcessToKeepCommand}"/>
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding SelectedProfile.ProcessesToKeep}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Border Background="{DynamicResource CardBrush}" CornerRadius="12"
+                                                Padding="12,7" Margin="0,0,6,6" BorderBrush="#1FFFFFFF" BorderThickness="1">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{Binding}" FontSize="10" Foreground="{DynamicResource TextBrush}"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1" MaxWidth="120"/>
+                                                <Button Padding="4" Width="20" Height="20" CornerRadius="10"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Command="{Binding $parent[UserControl].((vm:GameModeViewModel)DataContext).RemoveProcessToKeepCommand}"
+                                                        CommandParameter="{Binding}">
+                                                    <Path Data="M6 6l12 12M18 6L6 18" Stroke="{DynamicResource AccentBrush}"
+                                                          StrokeThickness="2" Width="9" Height="9" Stretch="Uniform"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" CornerRadius="22" Background="#0AFFFFFF" Margin="6,0,0,0"
+                            BorderBrush="#1FFFFFFF" BorderThickness="1" Padding="18">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="KILL ON START" FontSize="9" Foreground="{DynamicResource DangerBrush}" LetterSpacing="2"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBox Text="{Binding NewProcessToKill}" Watermark="name"
+                                         Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1"
+                                         CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,9" Margin="0,0,8,0"/>
+                                <Button Grid.Column="1" Classes="pill pillPrimary" Content="Add"
+                                        Command="{Binding AddProcessToKillCommand}"/>
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding SelectedProfile.ProcessesToKill}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Border Background="{DynamicResource CardBrush}" CornerRadius="12"
+                                                Padding="12,7" Margin="0,0,6,6" BorderBrush="#1FFFFFFF" BorderThickness="1">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{Binding}" FontSize="10" Foreground="{DynamicResource TextBrush}"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1" MaxWidth="120"/>
+                                                <Button Padding="4" Width="20" Height="20" CornerRadius="10"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Command="{Binding $parent[UserControl].((vm:GameModeViewModel)DataContext).RemoveProcessToKillCommand}"
+                                                        CommandParameter="{Binding}">
+                                                    <Path Data="M6 6l12 12M18 6L6 18" Stroke="{DynamicResource DangerBrush}"
+                                                          StrokeThickness="2" Width="9" Height="9" Stretch="Uniform"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Tweaks -->
+                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                        BorderBrush="#1FFFFFFF" BorderThickness="1"
+                        BoxShadow="0 8 24 -8 #4D000000" Padding="22">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="System Tweaks" FontSize="15" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Tweaks.ImplementedCount, StringFormat='{}{0} available'}"
+                                       FontSize="10" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <TextBox Text="{Binding Tweaks.SearchText}" Watermark="Search tweaks…"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                 Foreground="{DynamicResource TextBrush}" Padding="14,10"/>
+                        <ScrollViewer MaxHeight="220">
+                            <ItemsControl ItemsSource="{Binding Tweaks.FilteredRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TweakRowViewModel">
+                                        <Border Background="#0AFFFFFF" CornerRadius="14" Padding="14,10" Margin="0,3"
+                                                BorderBrush="#1FFFFFFF" BorderThickness="1">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <TextBlock Text="{Binding Definition.Name}" FontSize="11" FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource TextBrush}"
+                                                                   TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                        <Border CornerRadius="7" Padding="7,2" VerticalAlignment="Center"
+                                                                Background="{DynamicResource DangerBrush}"
+                                                                IsVisible="{Binding Definition.IsDangerous}">
+                                                            <TextBlock Text="RISK" FontSize="7" FontWeight="Bold" Foreground="White"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Definition.Description}" FontSize="9"
+                                                               Foreground="{DynamicResource TextMutedBrush}"
+                                                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Classes="pill" Padding="14,7" FontSize="10"
+                                                        VerticalAlignment="Center" Margin="12,0,0,0"
+                                                        Content="{Binding ToggleLabel}"
+                                                        Command="{Binding $parent[UserControl].((vm:GameModeViewModel)DataContext).Tweaks.ToggleTweakCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        IsEnabled="{Binding Definition.IsImplemented}"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>
