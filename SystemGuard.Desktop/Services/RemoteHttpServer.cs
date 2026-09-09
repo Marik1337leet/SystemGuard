@@ -131,8 +131,7 @@ public sealed class RemoteHttpServer : IDisposable
             }
             if (!Authorized(req))
             {
-                res.StatusCode = 401;
-                await WriteJson(res, new { ok = false, error = "Bad token" }).ConfigureAwait(false);
+                await WriteJson(res, new { ok = false, error = "Bad token" }, 401).ConfigureAwait(false);
                 return;
             }
 
@@ -145,14 +144,14 @@ public sealed class RemoteHttpServer : IDisposable
                 {
                     int w = QInt(req, "w", 960), q = QInt(req, "q", 55);
                     var jpg = await ScreenCaptureService.CaptureScreenJpegAsync(w, q).ConfigureAwait(false);
-                    if (jpg == null) { res.StatusCode = 500; await WriteJson(res, new { ok = false, error = "Capture failed" }).ConfigureAwait(false); break; }
+                    if (jpg == null) { await WriteJson(res, new { ok = false, error = "Capture failed" }, 500).ConfigureAwait(false); break; }
                     await WriteBytes(res, jpg, "image/jpeg").ConfigureAwait(false);
                     break;
                 }
                 case "/api/cam.jpg":
                 {
                     var (jpg, err) = await RemoteActions.GetCamJpegAsync().ConfigureAwait(false);
-                    if (jpg == null) { res.StatusCode = 503; await WriteJson(res, new { ok = false, error = err }).ConfigureAwait(false); break; }
+                    if (jpg == null) { await WriteJson(res, new { ok = false, error = err }, 503).ConfigureAwait(false); break; }
                     await WriteBytes(res, jpg, "image/jpeg").ConfigureAwait(false);
                     break;
                 }
@@ -167,7 +166,7 @@ public sealed class RemoteHttpServer : IDisposable
                 {
                     var p = (req.QueryString["path"] ?? "").Trim().Trim('"');
                     if (!File.Exists(p) || new FileInfo(p).Length > 50L * 1024 * 1024)
-                    { res.StatusCode = 404; await WriteJson(res, new { ok = false, error = "File not found or over 50 MB" }).ConfigureAwait(false); break; }
+                    { await WriteJson(res, new { ok = false, error = "File not found or over 50 MB" }, 404).ConfigureAwait(false); break; }
                     res.ContentType = "application/octet-stream";
                     res.AddHeader("Content-Disposition", $"attachment; filename=\"{Path.GetFileName(p)}\"");
                     await using (var fs = File.Open(p, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
@@ -177,7 +176,7 @@ public sealed class RemoteHttpServer : IDisposable
                 }
                 case "/api/action":
                 {
-                    if (req.HttpMethod != "POST") { res.StatusCode = 405; res.Close(); break; }
+                    if (req.HttpMethod != "POST") { await WriteJson(res, new { ok = false, error = "POST only" }, 405).ConfigureAwait(false); break; }
                     string body;
                     using (var sr = new StreamReader(req.InputStream, req.ContentEncoding ?? Encoding.UTF8))
                         body = await sr.ReadToEndAsync().ConfigureAwait(false);
@@ -196,8 +195,7 @@ public sealed class RemoteHttpServer : IDisposable
                     break;
                 }
                 default:
-                    res.StatusCode = 404;
-                    await WriteJson(res, new { ok = false, error = "Unknown endpoint" }).ConfigureAwait(false);
+                    await WriteJson(res, new { ok = false, error = "Unknown endpoint" }, 404).ConfigureAwait(false);
                     break;
             }
         }
@@ -238,12 +236,12 @@ public sealed class RemoteHttpServer : IDisposable
         return int.TryParse(req.QueryString[key], out var v) ? v : def;
     }
 
-    private static async Task WriteJson(HttpListenerResponse res, object obj)
+    private static async Task WriteJson(HttpListenerResponse res, object obj, int status = 200)
     {
         var bytes = JsonSerializer.SerializeToUtf8Bytes(obj, JsonOpts);
         res.ContentType = "application/json; charset=utf-8";
         res.ContentLength64 = bytes.Length;
-        res.StatusCode = 200;
+        res.StatusCode = status;
         try { await res.OutputStream.WriteAsync(bytes).ConfigureAwait(false); } catch { }
         try { res.Close(); } catch { }
     }

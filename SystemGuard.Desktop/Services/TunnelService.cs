@@ -37,31 +37,64 @@ public sealed class TunnelService : IDisposable
 
     public static bool BinaryExists => File.Exists(BinaryPath);
 
+    private static readonly SemaphoreSlim _dlGate = new(1, 1);
+
     public async Task<(bool Ok, string Message)> EnsureBinaryAsync(
         IProgress<string>? progress = null, CancellationToken ct = default)
     {
-        if (BinaryExists) return (true, "cloudflared ready");
+        // Одна загрузка за раз: параллельные Publish давали конфликт
+        // "file is being used by another process" на tmp-файле.
+        await _dlGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            if (BinaryExists) return (true, "cloudflared ready");
             const string url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe";
             var dir = Path.GetDirectoryName(BinaryPath)!;
             Directory.CreateDirectory(dir);
-            var tmp = BinaryPath + ".download";
-            progress?.Report("Downloading cloudflared (~30 MB)…");
-            using var res = await _dl.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-            res.EnsureSuccessStatusCode();
-            await using var net = await res.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-            await using var fs = File.Open(tmp, FileMode.Create, FileAccess.Write, FileShare.None);
-            await net.CopyToAsync(fs, ct).ConfigureAwait(false);
-            if (File.Exists(BinaryPath)) File.Delete(BinaryPath);
-            File.Move(tmp, BinaryPath);
-            progress?.Report("cloudflared ready");
-            return (true, "cloudflared ready");
+            // Уникальный tmp + ретраи: свежий exe часто лочит антивирус при скане
+            var tmp = BinaryPath + $".{Guid.NewGuid():N}.download";
+            try
+            {
+                progress?.Report("Downloading cloudflared (~30 MB)…");
+                using var res = await _dl.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                res.EnsureSuccessStatusCode();
+                await using var net = await res.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                await using var fs = File.Open(tmp, FileMode.Create, FileAccess.Write, FileShare.None);
+                await net.CopyToAsync(fs, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                try { File.Delete(tmp); } catch { }
+                return (false, $"Tunnel binary download failed: {Trim(ex.Message, 160)}");
+            }
+            // Перемещение с ретраями (антивирус/индексатор могут держать файл)
+            for (int i = 0; i < 6; i++)
+            {
+                try
+                {
+                    if (File.Exists(BinaryPath))
+                    {
+                        try { File.Delete(BinaryPath); }
+                        catch { await Task.Delay(1000, ct).ConfigureAwait(false); continue; }
+                    }
+                    File.Move(tmp, BinaryPath);
+                    progress?.Report("cloudflared ready");
+                    return (true, "cloudflared ready");
+                }
+                catch when (i < 5)
+                {
+                    try { await Task.Delay(1500, ct).ConfigureAwait(false); } catch { }
+                }
+                catch (Exception ex)
+                {
+                    try { File.Delete(tmp); } catch { }
+                    return (false, $"Tunnel binary install failed: {Trim(ex.Message, 160)}");
+                }
+            }
+            try { File.Delete(tmp); } catch { }
+            return (false, "Tunnel binary install failed: file is locked (antivirus?). Try again.");
         }
-        catch (Exception ex)
-        {
-            return (false, $"Tunnel binary download failed: {Trim(ex.Message, 160)}");
-        }
+        finally { _dlGate.Release(); }
     }
 
     public async Task<(bool Ok, string Message)> StartAsync(int localPort, CancellationToken ct = default)
@@ -120,40 +153,90 @@ public sealed class TunnelService : IDisposable
         }
     }
 
+    private readonly object _urlLock = new();
+    private string? _foundUrl;
+
+    private void CheckLine(string? line)
+    {
+        if (string.IsNullOrEmpty(line)) return;
+        var m = UrlRx.Match(line);
+        if (m.Success)
+        {
+            lock (_urlLock) _foundUrl ??= m.Value;
+            return;
+        }
+        if (line.Contains("trycloudflare", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("error", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("ERR", StringComparison.Ordinal))
+            AppendLog(Trim(line, 220));
+    }
+
+    private static readonly Regex UrlRx =
+        new(@"https://[a-zA-Z0-9-]+\.trycloudflare\.com", RegexOptions.Compiled);
+
     private async Task<string?> WaitForUrlAsync(Process p, TimeSpan timeout, CancellationToken ct)
     {
-        var rx = new Regex(@"https://[a-zA-Z0-9-]+\.trycloudflare\.com", RegexOptions.Compiled);
+        _foundUrl = null;
+        // cloudflared пишет URL в stderr, но новые версии могут и в stdout —
+        // слушаем оба. Stdout — через события, stderr — строго ОДИН pending
+        // ReadLine (повторный ReadLine на том же StreamReader роняет всё
+        // с "stream is currently in use" — это и убивало кнопку Publish).
+        try { p.OutputDataReceived += (_, e) => CheckLine(e.Data); p.BeginOutputReadLine(); }
+        catch { }
         var deadline = DateTime.UtcNow + timeout;
         var err = p.StandardError;
-        while (DateTime.UtcNow < deadline && !ct.IsCancellationRequested)
+        Task<string?>? pending = null;
+        try
         {
-            if (p.HasExited)
+            while (DateTime.UtcNow < deadline && !ct.IsCancellationRequested)
             {
+                lock (_urlLock) { if (_foundUrl != null) return _foundUrl; }
+                if (p.HasExited)
+                {
+                    if (pending != null)
+                    {
+                        try { CheckLine(await pending.ConfigureAwait(false)); } catch { }
+                        pending = null;
+                        lock (_urlLock) { if (_foundUrl != null) return _foundUrl; }
+                    }
+                    try
+                    {
+                        var rest = await err.ReadToEndAsync().ConfigureAwait(false);
+                        if (!string.IsNullOrWhiteSpace(rest))
+                        {
+                            AppendLog(Trim(rest.Trim(), 400));
+                            CheckLine(rest);
+                        }
+                    }
+                    catch { }
+                    lock (_urlLock) { if (_foundUrl != null) return _foundUrl; }
+                    AppendLog($"cloudflared exited (code {p.ExitCode})");
+                    return null;
+                }
+                pending ??= err.ReadLineAsync();
                 try
                 {
-                    var rest = await err.ReadToEndAsync().ConfigureAwait(false);
-                    if (!string.IsNullOrWhiteSpace(rest)) AppendLog(rest.Trim());
-                    var m2 = rx.Match(rest ?? "");
-                    if (m2.Success) return m2.Value;
+                    var done = await Task.WhenAny(pending, Task.Delay(500, ct)).ConfigureAwait(false);
+                    if (done != pending) continue; // таймаут тика — ждём ТОТ ЖЕ read
+                    CheckLine(await pending.ConfigureAwait(false));
+                    pending = null;
                 }
-                catch { }
-                AppendLog($"cloudflared exited (code {p.ExitCode})");
-                return null;
+                catch (OperationCanceledException) { return null; }
+                catch (Exception ex)
+                {
+                    AppendLog("log read: " + Trim(ex.Message, 120));
+                    pending = null;
+                    try { await Task.Delay(500, ct).ConfigureAwait(false); }
+                    catch (OperationCanceledException) { return null; }
+                }
             }
-            var task = err.ReadLineAsync();
-            var done = await Task.WhenAny(task, Task.Delay(500, ct)).ConfigureAwait(false);
-            if (done != task) continue;
-            var line = await task.ConfigureAwait(false);
-            if (line == null) { await Task.Delay(300, ct).ConfigureAwait(false); continue; }
-            if (line.Contains("trycloudflare", StringComparison.OrdinalIgnoreCase) ||
-                line.Contains("error", StringComparison.OrdinalIgnoreCase) ||
-                line.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
-                line.Contains("ERR", StringComparison.Ordinal))
-                AppendLog(Trim(line, 220));
-            var m = rx.Match(line);
-            if (m.Success) return m.Value;
+            lock (_urlLock) return _foundUrl;
         }
-        return null;
+        finally
+        {
+            try { p.CancelOutputRead(); } catch { }
+        }
     }
 
     public void Stop()

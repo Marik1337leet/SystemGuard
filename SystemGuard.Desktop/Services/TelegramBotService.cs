@@ -138,6 +138,8 @@ public sealed class TelegramBotService : IDisposable
         }
     }
 
+    private bool Ready() => _botClient != null && !_disposed;
+
     private async Task ListenAsync(CancellationToken ct)
     {
         int offset = 0;
@@ -422,6 +424,7 @@ public sealed class TelegramBotService : IDisposable
             case "/volume":
                 if (!string.IsNullOrWhiteSpace(arg)) { await SetVolume(cid, arg).ConfigureAwait(false); break; }
                 SetPending(cid, async v => await SetVolume(cid, v).ConfigureAwait(false));
+                if (!Ready()) return;
                 await _botClient!.SendTextMessageAsync(cid, "Enter volume (0-100), 'up', 'down' or 'mute':",
                     replyMarkup: QuickKeyboard("80", "50", "20", "up", "down", "mute")).ConfigureAwait(false);
                 break;
@@ -429,6 +432,7 @@ public sealed class TelegramBotService : IDisposable
             case "/brightness":
                 if (!string.IsNullOrWhiteSpace(arg)) { await SetBrightness(cid, arg).ConfigureAwait(false); break; }
                 SetPending(cid, async v => await SetBrightness(cid, v).ConfigureAwait(false));
+                if (!Ready()) return;
                 await _botClient!.SendTextMessageAsync(cid, "Enter brightness (0-100):",
                     replyMarkup: QuickKeyboard("100", "70", "40")).ConfigureAwait(false);
                 break;
@@ -436,6 +440,7 @@ public sealed class TelegramBotService : IDisposable
             case "/open":
                 if (!string.IsNullOrWhiteSpace(arg)) { await OpenApp(cid, arg).ConfigureAwait(false); break; }
                 SetPending(cid, async v => await OpenApp(cid, v).ConfigureAwait(false));
+                if (!Ready()) return;
                 await _botClient!.SendTextMessageAsync(cid, "Enter app name:",
                     replyMarkup: QuickKeyboard("chrome", "steam", "notepad")).ConfigureAwait(false);
                 break;
@@ -702,6 +707,7 @@ public sealed class TelegramBotService : IDisposable
 
     private async Task SendWelcome(long cid)
     {
+        if (!Ready()) return;
         await _botClient!.SendTextMessageAsync(cid,
             $"<b>SystemGuard Remote</b>\n<code>{Esc(Environment.MachineName)}</code>\n\n" +
             "Pick a button below, open the <b>Web App</b> for the full panel,\n" +
@@ -1108,7 +1114,10 @@ public sealed class TelegramBotService : IDisposable
         }
     }
 
-    private async Task ShowLicenseMenu(long cid) => await _botClient!.SendTextMessageAsync(cid,
+    private async Task ShowLicenseMenu(long cid)
+    {
+        if (!Ready()) return;
+        await _botClient!.SendTextMessageAsync(cid,
         "<b>SystemGuard Pro</b>\n\n" +
         "Monthly — <b>300 Stars</b>\n" +
         "Half-Year — <b>1000 Stars</b>\n" +
@@ -1123,6 +1132,7 @@ public sealed class TelegramBotService : IDisposable
             new[] { InlineKeyboardButton.WithCallbackData("Yearly — 1800 Stars", "buy_yearly") },
             new[] { InlineKeyboardButton.WithCallbackData("Lifetime — 3000 Stars", "buy_lifetime") },
         })).ConfigureAwait(false);
+    }
 
     private async Task HandleCallback(string? d, long cid)
     {
@@ -1139,6 +1149,7 @@ public sealed class TelegramBotService : IDisposable
     // Stars: currency XTR, providerToken не передаём вообще (иначе PAYMENT_PROVIDER_INVALID)
     private async Task SendInvoice(long cid, string n, int s, int m)
     {
+        if (!Ready()) return;
         try
         {
             await _botClient!.SendInvoiceAsync(
@@ -1282,3 +1293,4 @@ internal class BotTask
     public string Time { get; set; } = "";
     public long ChatId { get; set; }
 }
+

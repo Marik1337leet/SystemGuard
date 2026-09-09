@@ -19,6 +19,7 @@
 		<PackageReference Include="FlashCap" Version="1.8.0.1" />
 		<PackageReference Include="LibreHardwareMonitorLib" Version="0.9.3" />
 		<PackageReference Include="LiveChartsCore.SkiaSharpView.Avalonia" Version="2.0.4" />
+		<PackageReference Include="NAudio.Wasapi" Version="3.1.0" />
 		<PackageReference Include="SkiaSharp" Version="2.88.9" />
 		<PackageReference Include="Avalonia.ReactiveUI" Version="11.1.0" />
 		<PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.9" />

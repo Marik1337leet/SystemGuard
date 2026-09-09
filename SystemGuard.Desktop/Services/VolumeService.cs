@@ -1,80 +1,21 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using NAudio.CoreAudioApi;
 
 namespace SystemGuard.Desktop.Services;
 
-// Громкость через CoreAudio (IAudioEndpointVolume) — настоящий мастер-канал
+// Громкость через CoreAudio (NAudio.Wasapi) — настоящий мастер-канал
 // устройства вывода, а не legacy waveOut, который на половине систем
 // двигает "не тот" ползунок и звук не меняется.
+// (Свой COM-interop убран: QI на IMMDeviceEnumerator сыпался E_NOINTERFACE,
+//  а NAudio на той же машине работает — проверено тестами.)
 // Fallback-цепочка: CoreAudio → winmm waveOut → системные клавиши.
 public static class VolumeService
 {
-    #region CoreAudio COM
-    private enum EDataFlow { eRender = 0, eCapture = 1, eAll = 2 }
-    private enum ERole { eConsole = 0, eMultimedia = 1, eCommunications = 2 }
+    public static string LastDiag { get; private set; } = "";
 
-    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
-    private class MMDeviceEnumeratorCom { }
-
-    [Guid("A95664D2-9614-4F35-A746-DE8DB636B87C"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDeviceEnumerator
-    {
-        [PreserveSig] int EnumAudioEndpoints(EDataFlow dataFlow, int dwStateMask, out IntPtr ppDevices);
-        [PreserveSig] int GetDefaultAudioEndpoint(EDataFlow dataFlow, ERole role, out IMMDevice ppDevice);
-    }
-
-    [Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDevice
-    {
-        [PreserveSig] int Activate(ref Guid iid, int dwClsCtx, IntPtr pActivationParams,
-            [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
-    }
-
-    [Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IAudioEndpointVolume
-    {
-        [PreserveSig] int RegisterControlChangeNotify(IntPtr pNotify);
-        [PreserveSig] int UnregisterControlChangeNotify(IntPtr pNotify);
-        [PreserveSig] int GetChannelCount(out int pnChannelCount);
-        [PreserveSig] int SetMasterVolumeLevel(float fLevelDB, Guid pguidEventContext);
-        [PreserveSig] int SetMasterVolumeLevelScalar(float fLevel, Guid pguidEventContext);
-        [PreserveSig] int GetMasterVolumeLevel(out float pfLevelDB);
-        [PreserveSig] int GetMasterVolumeLevelScalar(out float pfLevel);
-        [PreserveSig] int SetChannelVolumeLevel(uint nChannel, float fLevelDB, Guid pguidEventContext);
-        [PreserveSig] int SetChannelVolumeLevelScalar(uint nChannel, float fLevel, Guid pguidEventContext);
-        [PreserveSig] int GetChannelVolumeLevel(uint nChannel, out float pfLevelDB);
-        [PreserveSig] int GetChannelVolumeLevelScalar(uint nChannel, out float pfLevel);
-        [PreserveSig] int SetMute([MarshalAs(UnmanagedType.Bool)] bool bMute, Guid pguidEventContext);
-        [PreserveSig] int GetMute([MarshalAs(UnmanagedType.Bool)] out bool pbMute);
-    }
-
-    private static IAudioEndpointVolume? GetEndpoint()
-    {
-        try
-        {
-            var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorCom();
-            try
-            {
-                if (enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out var dev) != 0 || dev == null)
-                    return null;
-                try
-                {
-                    var iid = new Guid("5CDF2C82-841E-4546-9722-0CF74078229A");
-                    if (dev.Activate(ref iid, 23 /*CLSCTX_ALL*/, IntPtr.Zero, out var obj) != 0)
-                        return null;
-                    return (IAudioEndpointVolume)obj;
-                }
-                finally { try { Marshal.ReleaseComObject(dev); } catch { } }
-            }
-            finally { try { Marshal.ReleaseComObject(enumerator); } catch { } }
-        }
-        catch { return null; }
-    }
-    #endregion
-
-    #region Legacy
     [DllImport("winmm.dll")] private static extern int waveOutSetVolume(IntPtr hwo, uint dwVolume);
     [DllImport("winmm.dll")] private static extern int waveOutGetVolume(IntPtr hwo, out uint dwVolume);
     [DllImport("user32.dll")] private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
@@ -82,29 +23,39 @@ public static class VolumeService
     private const byte VK_VOLUME_MUTE = 0xAD;
     private const byte VK_VOLUME_DOWN = 0xAE;
     private const byte VK_VOLUME_UP = 0xAF;
-    #endregion
+
+    private static MMDevice? DefaultRender()
+    {
+        try
+        {
+            using var en = new MMDeviceEnumerator();
+            return en.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+        }
+        catch (Exception ex)
+        {
+            LastDiag = "endpoint: " + ex.GetType().Name + " " + Trim(ex.Message, 100);
+            return null;
+        }
+    }
 
     public static int GetPercent()
     {
         try
         {
-            var ep = GetEndpoint();
-            if (ep != null)
+            using var dev = DefaultRender();
+            if (dev != null)
             {
-                try
-                {
-                    if (ep.GetMute(out bool muted) == 0 && muted) return 0;
-                    if (ep.GetMasterVolumeLevelScalar(out float level) == 0)
-                        return (int)Math.Round(Math.Clamp(level, 0, 1) * 100);
-                }
-                finally { try { Marshal.ReleaseComObject(ep); } catch { } }
+                var v = dev.AudioEndpointVolume;
+                if (v.Mute) return 0;
+                LastDiag = "get: ok";
+                return (int)Math.Round(Math.Clamp(v.MasterVolumeLevelScalar, 0, 1) * 100);
             }
         }
-        catch { }
+        catch (Exception ex) { LastDiag = "get: " + ex.GetType().Name; }
         try
         {
-            if (waveOutGetVolume(IntPtr.Zero, out uint v) == 0)
-                return (int)Math.Round((v & 0xFFFF) / 65535.0 * 100);
+            if (waveOutGetVolume(IntPtr.Zero, out uint w) == 0)
+                return (int)Math.Round((w & 0xFFFF) / 65535.0 * 100);
         }
         catch { }
         return -1;
@@ -114,10 +65,9 @@ public static class VolumeService
     {
         try
         {
-            var ep = GetEndpoint();
-            if (ep == null) return false;
-            try { return ep.GetMute(out bool m) == 0 && m; }
-            finally { try { Marshal.ReleaseComObject(ep); } catch { } }
+            using var dev = DefaultRender();
+            if (dev == null) return false;
+            return dev.AudioEndpointVolume.Mute;
         }
         catch { return false; }
     }
@@ -128,19 +78,18 @@ public static class VolumeService
         percent = Math.Clamp(percent, 0, 100);
         try
         {
-            var ep = GetEndpoint();
-            if (ep != null)
+            using var dev = DefaultRender();
+            if (dev != null)
             {
-                try
-                {
-                    if (ep.SetMute(false, Guid.Empty) != 0) return -1;
-                    if (ep.SetMasterVolumeLevelScalar(percent / 100f, Guid.Empty) != 0) return -1;
-                    return GetPercent();
-                }
-                finally { try { Marshal.ReleaseComObject(ep); } catch { } }
+                var v = dev.AudioEndpointVolume;
+                v.Mute = false;
+                v.MasterVolumeLevelScalar = percent / 100f;
+                int back = GetPercent();
+                LastDiag = "set: ok";
+                return back;
             }
         }
-        catch { }
+        catch (Exception ex) { LastDiag = "set: " + ex.GetType().Name + " " + Trim(ex.Message, 100); }
         try
         {
             uint ch = (uint)Math.Round(percent / 100.0 * 65535);
@@ -155,18 +104,16 @@ public static class VolumeService
     {
         try
         {
-            var ep = GetEndpoint();
-            if (ep != null)
+            using var dev = DefaultRender();
+            if (dev != null)
             {
-                try
-                {
-                    ep.GetMute(out bool m);
-                    if (ep.SetMute(!m, Guid.Empty) == 0) return;
-                }
-                finally { try { Marshal.ReleaseComObject(ep); } catch { } }
+                var v = dev.AudioEndpointVolume;
+                v.Mute = !v.Mute;
+                LastDiag = "mute: ok";
+                return;
             }
         }
-        catch { }
+        catch (Exception ex) { LastDiag = "mute: " + ex.GetType().Name; }
         Press(VK_VOLUME_MUTE, 1);
     }
 
@@ -197,4 +144,7 @@ public static class VolumeService
         Thread.Sleep(70);
         keybd_event(vk, 0, 2, UIntPtr.Zero);
     });
+
+    private static string Trim(string s, int n) =>
+        string.IsNullOrEmpty(s) ? "" : (s.Length <= n ? s : s[..n] + "…");
 }
