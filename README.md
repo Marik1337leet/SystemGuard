@@ -27,7 +27,17 @@ dotnet build SystemGuard.Desktop/SystemGuard.Desktop.csproj
 4. В чате с ботом: `/start`. Кнопка **🌐 Web App** открывает мини-приложение.
 
 Команды понимают аргумент в одну строку: `/ls C:\Games`, `/cmd ipconfig`,
-`/volume 70`, `/open chrome`, `/close notepad`.
+`/volume 70`, `/open chrome`, `/close notepad`. Оплата Pro — Telegram Stars.
+
+### WebApp: два режима
+
+* **Live** (рекомендуется): на ПК во вкладке Telegram нажмите **Publish live link**
+  (поднимается HTTPS через Cloudflare Tunnel к локальному API). В WebApp во
+  вкладке **Live** введите ссылку + токен — и прямо в приложении: живые статы,
+  скриншоты, MJPEG-видео экрана, кадры камеры, мгновенные слайдеры громкости и
+  яркости, файлы с inline-списком и скачиванием, вывод CMD на экране.
+* **Relay** (без настройки): команды уходят через `sendData` в бот,
+  ответы приходят сообщениями в чат. Токенов в браузере нет.
 
 ### WebApp
 

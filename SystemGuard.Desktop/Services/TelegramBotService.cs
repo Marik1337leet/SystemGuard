@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -19,14 +18,15 @@ using File = System.IO.File;
 
 namespace SystemGuard.Desktop.Services;
 
-// Полный рерайт v2: бот больше не вешает ни себя, ни приложение.
-//   • polling-цикл никогда не блокируется командами (каждый апдейт — отдельная задача);
-//   • отправка через шлюз с rate-limit + уважением к FloodWait (429 RetryAfter);
-//   • длинные выводы режутся на чанки, весь пользовательский текст HTML-экранируется;
-//   • команды понимают аргумент в том же сообщении: "/ls C:\" "/cmd ipconfig" "/volume 80";
-//   • двухшаговый ввод остался как fallback, когда аргумента нет;
-//   • MiniApp (WebApp) шлёт команды через Telegram.WebApp.sendData → web_app_data;
-//   • красивые HTML-карточки вместо сырого текста.
+// Telegram-бот v3.
+//   • polling-цикл отделён от исполнения команд (тяжёлая команда не вешает бота);
+//   • отправка через шлюз: rate-limit + уважение к FloodWait (429 RetryAfter);
+//   • длинные выводы режутся на чанки, пользовательский текст HTML-экранируется;
+//   • команды понимают аргумент в той же строке: "/ls C:\" "/cmd ipconfig";
+//   • громкость — winmm (мгновенно и точно), яркость — CIM с честной ошибкой;
+//   • камера — FlashCap (DirectShow/MediaFoundation), скриншот — общий сервис;
+//   • Stars-счета с пустым providerToken (иначе PAYMENT_PROVIDER_INVALID);
+//   • /live — ссылка на живой WebApp-доступ (Cloudflare Tunnel).
 public sealed class TelegramBotService : IDisposable
 {
     private string _token = "", _chatId = "";
@@ -34,7 +34,7 @@ public sealed class TelegramBotService : IDisposable
     private TelegramBotClient? _botClient;
     private CancellationTokenSource? _cts;
     private Task? _listenTask, _scheduleTask, _notifyTask;
-    private int _listening; // 0/1
+    private int _listening;
     private bool _disposed;
     private bool _notifyEnabled;
 
@@ -45,7 +45,6 @@ public sealed class TelegramBotService : IDisposable
     private readonly Dictionary<long, Func<string, Task>> _pendingActions = new();
     private readonly object _stateLock = new();
 
-    // ── Шлюз отправки: один мьютекс + минимальный интервал, чтобы не ловить 429 ──
     private readonly SemaphoreSlim _sendGate = new(1, 1);
     private DateTime _lastSendUtc = DateTime.MinValue;
     private static readonly TimeSpan MinSendInterval = TimeSpan.FromMilliseconds(150);
@@ -103,7 +102,7 @@ public sealed class TelegramBotService : IDisposable
     public void StartListening()
     {
         if (_botClient == null || _disposed) return;
-        if (Interlocked.Exchange(ref _listening, 1) == 1) return; // уже слушаем
+        if (Interlocked.Exchange(ref _listening, 1) == 1) return;
         StopTasks();
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
@@ -122,7 +121,6 @@ public sealed class TelegramBotService : IDisposable
     private void StopTasks()
     {
         try { _cts?.Cancel(); } catch { }
-        // Не ждём задачи синхронно (могут звать из UI) — просто отпускаем ссылки
         _listenTask = _scheduleTask = _notifyTask = null;
         try { _cts?.Dispose(); } catch { }
         _cts = null;
@@ -140,7 +138,6 @@ public sealed class TelegramBotService : IDisposable
         }
     }
 
-    // ── Polling: лёгкий цикл, тяжёлое — в отдельных задачах ─────────────────────
     private async Task ListenAsync(CancellationToken ct)
     {
         int offset = 0;
@@ -156,18 +153,16 @@ public sealed class TelegramBotService : IDisposable
                 foreach (var u in updates)
                 {
                     offset = u.Id + 1;
-                    // Не блокируем цикл: каждый апдейт живёт своей жизнью
                     _ = Task.Run(() => HandleUpdateSafe(u), ct);
                 }
             }
             catch (OperationCanceledException) { break; }
             catch (ApiRequestException ex) when (ex.ErrorCode == 409)
             {
-                // Второй инстанс бота с тем же токеном — ждём и пробуем дальше, а не спамим
                 try { await Task.Delay(TimeSpan.FromSeconds(10), ct).ConfigureAwait(false); }
                 catch (OperationCanceledException) { break; }
             }
-            catch (Exception)
+            catch
             {
                 try { await Task.Delay(TimeSpan.FromSeconds(2), ct).ConfigureAwait(false); }
                 catch (OperationCanceledException) { break; }
@@ -178,7 +173,7 @@ public sealed class TelegramBotService : IDisposable
     private async Task HandleUpdateSafe(Update u)
     {
         try { await HandleUpdate(u).ConfigureAwait(false); }
-        catch { /* один апдейт никогда не роняет цикл */ }
+        catch { }
     }
 
     private async Task HandleUpdate(Update u)
@@ -189,7 +184,7 @@ public sealed class TelegramBotService : IDisposable
             var cid = cq.Message?.Chat.Id ?? 0;
             if (cid != 0 && !IsAuthorized(cid))
             {
-                try { await _botClient!.AnswerCallbackQueryAsync(cq.Id, "⛔ Unauthorized").ConfigureAwait(false); }
+                try { await _botClient!.AnswerCallbackQueryAsync(cq.Id, "Unauthorized").ConfigureAwait(false); }
                 catch { }
                 return;
             }
@@ -214,12 +209,11 @@ public sealed class TelegramBotService : IDisposable
         if (msg == null) return;
         var cid2 = msg.Chat.Id;
 
-        // MiniApp: Telegram.WebApp.sendData(...) прилетает сюда как web_app_data
         if (msg.WebAppData != null)
         {
             if (!IsAuthorized(cid2))
             {
-                await SendHtml(cid2, "⛔ <b>Unauthorized.</b> Ask the PC owner to add your chat ID.").ConfigureAwait(false);
+                await SendHtml(cid2, "<b>Unauthorized.</b> Ask the PC owner to add your chat ID.").ConfigureAwait(false);
                 return;
             }
             Log("webapp:" + Trim(msg.WebAppData.Data, 120), cid2);
@@ -244,7 +238,7 @@ public sealed class TelegramBotService : IDisposable
         {
             if (!IsAuthorized(cid2))
             {
-                await SendHtml(cid2, "⛔ <b>Unauthorized.</b>\nYour chat ID: <code>" + cid2 + "</code>").ConfigureAwait(false);
+                await SendHtml(cid2, "<b>Unauthorized.</b>\nYour chat ID: <code>" + cid2 + "</code>").ConfigureAwait(false);
                 return;
             }
             Log(Trim(msg.Text, 120), cid2);
@@ -252,7 +246,6 @@ public sealed class TelegramBotService : IDisposable
         }
     }
 
-    // ── WebApp JSON-команды: {"action":"status"} {"action":"volume","arg":"70"} ──
     private async Task HandleWebAppData(string data, long cid)
     {
         string action = "", arg = "";
@@ -273,18 +266,13 @@ public sealed class TelegramBotService : IDisposable
         catch { action = data; }
 
         action = action.Trim().TrimStart('/').ToLowerInvariant();
-        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["power"] = "power", ["dashboard"] = "status", ["info"] = "status",
-            ["mute"] = "mute", ["play"] = "play", ["pause"] = "pause",
-        };
-        if (map.TryGetValue(action, out var m)) action = m;
+        if (action is "dashboard" or "info" or "power") action = "status";
+        if (action == "pause") action = "play";
 
         await HandleCommand("/" + action + (string.IsNullOrWhiteSpace(arg) ? "" : " " + arg.Trim()), cid)
             .ConfigureAwait(false);
     }
 
-    // ── Парсинг: "/ls C:\" или "Status", кнопки клавиатуры, webapp-экшены ───────
     private static string ExtractCommand(string text)
     {
         var parts = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -292,7 +280,7 @@ public sealed class TelegramBotService : IDisposable
             if (part.StartsWith("/"))
             {
                 var c = part.ToLower().Trim();
-                var at = c.IndexOf('@'); // "/status@MyBot" → "/status"
+                var at = c.IndexOf('@');
                 return at > 0 ? c[..at] : c;
             }
         return text.ToLower().Trim();
@@ -301,7 +289,7 @@ public sealed class TelegramBotService : IDisposable
     private static string ExtractArg(string text)
     {
         var i = text.IndexOf(' ');
-        return i < 0 ? "" : text[(i + 1)..].Trim().Trim('"', ' ');
+        return i < 0 ? "" : text[(i + 1)..].Trim().Trim('"');
     }
 
     private async Task HandleCommand(string rawText, long cid)
@@ -309,7 +297,6 @@ public sealed class TelegramBotService : IDisposable
         var text = (rawText ?? "").Trim();
         if (text.Length == 0) return;
 
-        // Ответ на двухшаговый запрос
         Func<string, Task>? pending;
         lock (_stateLock) _pendingActions.TryGetValue(cid, out pending);
         if (pending != null)
@@ -323,7 +310,7 @@ public sealed class TelegramBotService : IDisposable
             }
             lock (_stateLock) _pendingActions.Remove(cid);
             try { await pending(text).ConfigureAwait(false); }
-            catch (Exception ex) { await SendHtml(cid, "⚠️ " + Esc(Trim(ex.Message, 300))).ConfigureAwait(false); }
+            catch (Exception ex) { await SendHtml(cid, "Error: " + Esc(Trim(ex.Message, 300))).ConfigureAwait(false); }
             await Task.Delay(250).ConfigureAwait(false);
             await SendMainMenu(cid).ConfigureAwait(false);
             return;
@@ -337,76 +324,83 @@ public sealed class TelegramBotService : IDisposable
         {
             case "/start": await SendWelcome(cid).ConfigureAwait(false); break;
             case "/help": case "/menu": await SendHelp(cid).ConfigureAwait(false); break;
+            case "/live": await SendLiveCard(cid).ConfigureAwait(false); break;
             case "/status": await SendStatusCard(cid).ConfigureAwait(false); break;
             case "/apps": await SendRunningApps(cid).ConfigureAwait(false); break;
             case "/processes":
-                await SendHtml(cid, "⏳ <i>Collecting process list…</i>").ConfigureAwait(false);
+                await SendHtml(cid, "<i>Collecting process list…</i>").ConfigureAwait(false);
                 await SendMsg(cid, await Exec("tasklist /fo table").ConfigureAwait(false)).ConfigureAwait(false);
                 break;
             case "/shutdown":
                 if (!await RequireAdmin(cid).ConfigureAwait(false)) break;
                 await Exec("shutdown /s /t 60").ConfigureAwait(false);
-                await SendHtml(cid, "🔌 <b>Shutdown in 60 seconds.</b>\n/cancel — abort").ConfigureAwait(false);
+                await SendHtml(cid, "<b>Shutdown in 60 seconds.</b>\n/cancel — abort").ConfigureAwait(false);
                 break;
             case "/restart":
                 if (!await RequireAdmin(cid).ConfigureAwait(false)) break;
                 await Exec("shutdown /r /t 60").ConfigureAwait(false);
-                await SendHtml(cid, "🔄 <b>Restart in 60 seconds.</b>\n/cancel — abort").ConfigureAwait(false);
+                await SendHtml(cid, "<b>Restart in 60 seconds.</b>\n/cancel — abort").ConfigureAwait(false);
                 break;
             case "/cancel":
                 if (!await RequireAdmin(cid).ConfigureAwait(false)) break;
                 await Exec("shutdown /a").ConfigureAwait(false);
-                await SendHtml(cid, "✅ Shutdown timer cancelled.").ConfigureAwait(false);
+                await SendHtml(cid, "Shutdown timer cancelled.").ConfigureAwait(false);
                 break;
             case "/sleep":
                 await Exec("rundll32.exe powrprof.dll,SetSuspendState 0,1,0").ConfigureAwait(false);
-                await SendHtml(cid, "🌙 PC is going to <b>sleep</b>.").ConfigureAwait(false);
+                await SendHtml(cid, "PC is going to <b>sleep</b>.").ConfigureAwait(false);
                 break;
             case "/lock":
                 await Exec("rundll32.exe user32.dll,LockWorkStation").ConfigureAwait(false);
-                await SendHtml(cid, "🔒 Workstation <b>locked</b>.").ConfigureAwait(false);
+                await SendHtml(cid, "Workstation <b>locked</b>.").ConfigureAwait(false);
                 break;
             case "/screenshot": await SendScreenshotToChat(cid).ConfigureAwait(false); break;
             case "/stream":
                 StartScreenStream(cid);
-                await SendHtml(cid, "📡 <b>Live screen started</b> (~1 frame / 2.5s, auto-stop in 5 min).\n/stop — end").ConfigureAwait(false);
+                await SendHtml(cid, "<b>Live screen started</b> (1 frame / 2.5s, auto-stop in 5 min).\n/stop — end").ConfigureAwait(false);
                 break;
             case "/stop":
                 StopScreenStream(cid);
-                await SendHtml(cid, "🛑 Stream stopped.").ConfigureAwait(false);
+                await SendHtml(cid, "Stream stopped.").ConfigureAwait(false);
                 break;
             case "/cam": await SendWebcamToChat(cid).ConfigureAwait(false); break;
             case "/mute":
-                await Exec("powershell -Command \"$ws=New-Object -ComObject WScript.Shell;$ws.SendKeys([char]173)\"").ConfigureAwait(false);
-                await SendHtml(cid, "🔇 Muted.").ConfigureAwait(false);
+                await Task.Run(() => VolumeService.MuteToggle()).ConfigureAwait(false);
+                await SendHtml(cid, $"Muted. Volume: <b>{VolumeService.GetPercent()}%</b>").ConfigureAwait(false);
                 break;
 
             case "/ls":
                 if (!string.IsNullOrWhiteSpace(arg)) { await ListDir(cid, arg).ConfigureAwait(false); break; }
                 SetPending(cid, async v => await ListDir(cid, v).ConfigureAwait(false));
-                await Ask(cid, "📁 <b>Enter folder path</b> (empty = Desktop):").ConfigureAwait(false);
+                await Ask(cid, "<b>Enter folder path</b> (empty = Desktop):").ConfigureAwait(false);
                 break;
             case "/get":
                 if (!string.IsNullOrWhiteSpace(arg)) { await SendFileToChat(cid, arg).ConfigureAwait(false); break; }
                 SetPending(cid, async v => await SendFileToChat(cid, v).ConfigureAwait(false));
-                await Ask(cid, "📥 <b>Enter file path on PC:</b>").ConfigureAwait(false);
+                await Ask(cid, "<b>Enter file path on PC:</b>").ConfigureAwait(false);
                 break;
             case "/clean":
                 if (!await RequireAdmin(cid).ConfigureAwait(false)) break;
-                await SendHtml(cid, "🧹 <i>Cleaning temp files…</i>").ConfigureAwait(false);
+                await SendHtml(cid, "<i>Cleaning temp files…</i>").ConfigureAwait(false);
                 var r = await Exec("del /q /f %temp%\\* 2>nul & echo Done").ConfigureAwait(false);
-                await SendHtml(cid, "🧹 <b>Cleanup:</b> <code>" + Esc(Trim(r, 500)) + "</code>").ConfigureAwait(false);
+                await SendHtml(cid, "<b>Cleanup:</b> <code>" + Esc(Trim(r, 500)) + "</code>").ConfigureAwait(false);
                 break;
             case "/optimize_ram": case "/ram":
                 await Exec("powershell [GC]::Collect()").ConfigureAwait(false);
-                await SendHtml(cid, "⚡ RAM trim requested.").ConfigureAwait(false);
+                await SendHtml(cid, "RAM trim requested.").ConfigureAwait(false);
                 break;
             case "/play": case "/pause":
-                await MediaKey(0xB3).ConfigureAwait(false);
-                await SendHtml(cid, "⏯ Play/Pause.").ConfigureAwait(false);
+                await VolumeService.MediaAsync(VolumeService.VK_MEDIA_PLAY_PAUSE).ConfigureAwait(false);
+                await SendHtml(cid, "Play/Pause sent.").ConfigureAwait(false);
                 break;
-            case "/next": await MediaKey(0xB0).ConfigureAwait(false); await SendHtml(cid, "⏭ Next track.").ConfigureAwait(false); break;
-            case "/prev": await MediaKey(0xB1).ConfigureAwait(false); await SendHtml(cid, "⏮ Previous track.").ConfigureAwait(false); break;
+            case "/next":
+                await VolumeService.MediaAsync(VolumeService.VK_MEDIA_NEXT).ConfigureAwait(false);
+                await SendHtml(cid, "Next track sent.").ConfigureAwait(false);
+                break;
+            case "/prev":
+                await VolumeService.MediaAsync(VolumeService.VK_MEDIA_PREV).ConfigureAwait(false);
+                await SendHtml(cid, "Previous track sent.").ConfigureAwait(false);
+                break;
             case "/license":
                 switch (arg.Trim().ToLowerInvariant())
                 {
@@ -419,27 +413,27 @@ public sealed class TelegramBotService : IDisposable
                 break;
             case "/files":
                 await SendHtml(cid,
-                    "📂 <b>Files</b>\n• <code>/ls C:\\</code> — list folder\n• <code>/get C:\\a.txt</code> — download from PC\n• Just send any file/photo — it lands in <b>Desktop\\TG Downloads</b>").ConfigureAwait(false);
+                    "<b>Files</b>\n• <code>/ls C:\\</code> — list folder\n• <code>/get C:\\file.txt</code> — download from PC\n• Send any file/photo — it lands in <b>Desktop\\TG Downloads</b>").ConfigureAwait(false);
                 break;
 
             case "/volume":
                 if (!string.IsNullOrWhiteSpace(arg)) { await SetVolume(cid, arg).ConfigureAwait(false); break; }
                 SetPending(cid, async v => await SetVolume(cid, v).ConfigureAwait(false));
-                await _botClient!.SendTextMessageAsync(cid, "🔊 Enter volume (0-100), 'up', 'down' or 'mute':",
+                await _botClient!.SendTextMessageAsync(cid, "Enter volume (0-100), 'up', 'down' or 'mute':",
                     replyMarkup: QuickKeyboard("80", "50", "20", "up", "down", "mute")).ConfigureAwait(false);
                 break;
 
             case "/brightness":
                 if (!string.IsNullOrWhiteSpace(arg)) { await SetBrightness(cid, arg).ConfigureAwait(false); break; }
                 SetPending(cid, async v => await SetBrightness(cid, v).ConfigureAwait(false));
-                await _botClient!.SendTextMessageAsync(cid, "🔆 Enter brightness (0-100):",
+                await _botClient!.SendTextMessageAsync(cid, "Enter brightness (0-100):",
                     replyMarkup: QuickKeyboard("100", "70", "40")).ConfigureAwait(false);
                 break;
 
             case "/open":
                 if (!string.IsNullOrWhiteSpace(arg)) { await OpenApp(cid, arg).ConfigureAwait(false); break; }
                 SetPending(cid, async v => await OpenApp(cid, v).ConfigureAwait(false));
-                await _botClient!.SendTextMessageAsync(cid, "🚀 Enter app name:",
+                await _botClient!.SendTextMessageAsync(cid, "Enter app name:",
                     replyMarkup: QuickKeyboard("chrome", "steam", "notepad")).ConfigureAwait(false);
                 break;
 
@@ -447,36 +441,36 @@ public sealed class TelegramBotService : IDisposable
                 if (!await RequireAdmin(cid).ConfigureAwait(false)) break;
                 if (!string.IsNullOrWhiteSpace(arg)) { await KillProcess(cid, arg).ConfigureAwait(false); break; }
                 SetPending(cid, async v => await KillProcess(cid, v).ConfigureAwait(false));
-                await Ask(cid, "❌ <b>Enter process name to terminate:</b>").ConfigureAwait(false);
+                await Ask(cid, "<b>Enter process name to terminate:</b>").ConfigureAwait(false);
                 break;
 
             case "/cmd":
                 if (!await RequireAdmin(cid).ConfigureAwait(false)) break;
                 if (!string.IsNullOrWhiteSpace(arg)) { await ExecuteAndSend(cid, arg).ConfigureAwait(false); break; }
                 SetPending(cid, async v => await ExecuteAndSend(cid, v).ConfigureAwait(false));
-                await Ask(cid, "💻 <b>Enter CMD command:</b>").ConfigureAwait(false);
+                await Ask(cid, "<b>Enter CMD command:</b>").ConfigureAwait(false);
                 break;
 
             case "/ip": await SendHtml(cid, await GetIpCard().ConfigureAwait(false)).ConfigureAwait(false); break;
             case "/ping":
-                await SendHtml(cid, "📶 <i>Pinging 8.8.8.8…</i>").ConfigureAwait(false);
-                await SendHtml(cid, $"📶 Ping 8.8.8.8: <b>{await new NetworkService().TestLatency().ConfigureAwait(false)} ms</b>").ConfigureAwait(false);
+                await SendHtml(cid, "<i>Pinging 8.8.8.8…</i>").ConfigureAwait(false);
+                await SendHtml(cid, $"Ping 8.8.8.8: <b>{await new NetworkService().TestLatency().ConfigureAwait(false)} ms</b>").ConfigureAwait(false);
                 break;
             case "/uptime":
-                await SendHtml(cid, $"⏱ <b>Uptime:</b> {Esc($"{TimeSpan.FromMilliseconds(Environment.TickCount64):d\\d\\ h\\h\\ m\\m}")}").ConfigureAwait(false);
+                await SendHtml(cid, $"<b>Uptime:</b> {Esc($"{TimeSpan.FromMilliseconds(Environment.TickCount64):d\\d\\ h\\h\\ m\\m}")}").ConfigureAwait(false);
                 break;
-            case "/battery": await SendHtml(cid, "🔋 " + Esc(GetBatteryLine())).ConfigureAwait(false); break;
-            case "/free": await SendHtml(cid, "💾\n" + Esc(GetFreeSpace())).ConfigureAwait(false); break;
+            case "/battery": await SendHtml(cid, Esc(GetBatteryLine())).ConfigureAwait(false); break;
+            case "/free": await SendHtml(cid, Esc(GetFreeSpace())).ConfigureAwait(false); break;
             case "/users":
                 int au, ad;
                 lock (_stateLock) { au = _authorizedUsers.Count; ad = _adminUsers.Count; }
-                await SendHtml(cid, $"👥 Authorized: <b>{au}</b> (admins: <b>{ad}</b>)").ConfigureAwait(false);
+                await SendHtml(cid, $"Authorized: <b>{au}</b> (admins: <b>{ad}</b>)").ConfigureAwait(false);
                 break;
             case "/log":
             {
                 string[] lines;
                 lock (_stateLock) lines = _actionLog.Take(10).ToArray();
-                await SendHtml(cid, "🧾 <b>Recent actions:</b>\n" + Esc(string.Join("\n", lines))).ConfigureAwait(false);
+                await SendHtml(cid, "<b>Recent actions:</b>\n" + Esc(string.Join("\n", lines))).ConfigureAwait(false);
                 break;
             }
 
@@ -491,10 +485,10 @@ public sealed class TelegramBotService : IDisposable
         lock (_stateLock) _pendingActions[cid] = fn;
     }
 
+    // Текст кнопок ReplyKeyboard → команды (и со старыми эмодзи-вариантами для совместимости)
     private static string? MapButtonToCommand(string cmd) => cmd switch
     {
         "status" => "/status",
-        "🖥 status" => "/status",
         "processes" => "/processes",
         "apps" => "/apps",
         "volume" => "/volume",
@@ -514,6 +508,7 @@ public sealed class TelegramBotService : IDisposable
         "close app" => "/close",
         "lock" => "/lock",
         "license" => "/license",
+        "live" => "/live",
         "help" => "/help",
         _ => null
     };
@@ -539,11 +534,10 @@ public sealed class TelegramBotService : IDisposable
     private async Task<bool> RequireAdmin(long cid)
     {
         if (IsAdmin(cid)) return true;
-        await SendHtml(cid, "⛔ Admins only. Ask the owner for access.").ConfigureAwait(false);
+        await SendHtml(cid, "Admins only. Ask the owner for access.").ConfigureAwait(false);
         return false;
     }
 
-    // ── Красивые карточки ───────────────────────────────────────────────────────
     private async Task SendStatusCard(long cid)
     {
         string card;
@@ -557,30 +551,49 @@ public sealed class TelegramBotService : IDisposable
             {
                 drives = string.Join("\n", DriveInfo.GetDrives()
                     .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
-                    .Select(d => $"   • <b>{Esc(d.Name)}</b> {d.AvailableFreeSpace / 1073741824.0:F1} GB free"));
-                if (string.IsNullOrWhiteSpace(drives)) drives = "   • —";
+                    .Select(d => $"  • <b>{Esc(d.Name)}</b> {d.AvailableFreeSpace / 1073741824.0:F1} GB free"));
+                if (string.IsNullOrWhiteSpace(drives)) drives = "  • —";
             }
-            catch { drives = "   • —"; }
+            catch { drives = "  • —"; }
 
-            string batt = GetBatteryLine();
             var up = TimeSpan.FromMilliseconds(Environment.TickCount64);
             var upStr = up.TotalDays >= 1 ? $"{(int)up.TotalDays}d {up.Hours}h {up.Minutes}m"
                 : up.TotalHours >= 1 ? $"{(int)up.TotalHours}h {up.Minutes}m" : $"{up.Minutes}m";
 
-            card = $"🖥 <b>{Esc(Environment.MachineName)}</b> — <i>online</i>\n" +
-                   $"🧩 <code>{Esc(Environment.OSVersion.VersionString)}</code> • {Environment.ProcessorCount} cores\n" +
-                   $"⏱ Uptime: <b>{upStr}</b>\n\n" +
-                   $"🧠 <b>RAM</b> {usedGb:F1}/{totalGb:F1} GB ({ramPct:F0}%)\n" +
+            card = $"<b>{Esc(Environment.MachineName)}</b> — <i>online</i>\n" +
+                   $"<code>{Esc(Environment.OSVersion.VersionString)}</code> • {Environment.ProcessorCount} cores\n" +
+                   $"Uptime: <b>{upStr}</b>\n\n" +
+                   $"<b>RAM</b> {usedGb:F1}/{totalGb:F1} GB ({ramPct:F0}%)\n" +
                    $"{Bar(ramPct)}\n\n" +
-                   $"💾 <b>Disks</b>\n{drives}\n\n" +
-                   $"🔋 {Esc(batt)}\n" +
-                   $"🕒 <i>{DateTime.Now:G}</i>";
+                   $"<b>Disks</b>\n{drives}\n\n" +
+                   $"{Esc(GetBatteryLine())}\n" +
+                   $"<i>{DateTime.Now:G}</i>";
         }
         catch (Exception ex)
         {
-            card = "⚠️ Status failed: <code>" + Esc(Trim(ex.Message, 200)) + "</code>";
+            card = "Status failed: <code>" + Esc(Trim(ex.Message, 200)) + "</code>";
         }
         await SendHtml(cid, card).ConfigureAwait(false);
+    }
+
+    private async Task SendLiveCard(long cid)
+    {
+        var tunnel = LiveServices.Tunnel;
+        var url = tunnel.PublicUrl;
+        if (string.IsNullOrEmpty(url) || !tunnel.IsRunning)
+        {
+            await SendHtml(cid,
+                "<b>Live WebApp access is off.</b>\n\n" +
+                "On the PC open SystemGuard → Telegram tab → <b>Publish live link</b>, " +
+                "then enter the shown address + token in the WebApp <b>Live</b> tab.\n\n" +
+                "Without it the WebApp works in relay mode: commands from the app, replies here in chat.").ConfigureAwait(false);
+            return;
+        }
+        await SendHtml(cid,
+            "<b>Live access is ON.</b>\n\n" +
+            $"Server: <code>{Esc(url)}</code>\n" +
+            $"Token: <code>{Esc(LiveServices.Token)}</code>\n\n" +
+            "Enter both in the WebApp <b>Live</b> tab: live stats, screen, camera and instant controls right inside the app.").ConfigureAwait(false);
     }
 
     private static string Bar(double pct, int width = 10)
@@ -596,9 +609,9 @@ public sealed class TelegramBotService : IDisposable
             var ext = await new NetworkService().GetPublicIpAsync().ConfigureAwait(false);
             var local = string.Join(", ", System.Net.Dns.GetHostAddresses(System.Net.Dns.GetHostName())
                 .Where(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork).Select(a => a.ToString()));
-            return $"🌐 <b>Network</b>\n• External: <code>{Esc(ext)}</code>\n• Local: <code>{Esc(local)}</code>";
+            return $"<b>Network</b>\n• External: <code>{Esc(ext)}</code>\n• Local: <code>{Esc(local)}</code>";
         }
-        catch (Exception ex) { return "⚠️ " + Esc(ex.Message); }
+        catch (Exception ex) { return Esc(ex.Message); }
     }
 
     private static string GetBatteryLine()
@@ -626,41 +639,34 @@ public sealed class TelegramBotService : IDisposable
         catch (Exception ex) { return ex.Message; }
     }
 
-    // ── MEDIA KEYS ──
-    [DllImport("user32.dll")] private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-    private static async Task MediaKey(byte key)
-    {
-        await Task.Run(() =>
-        {
-            keybd_event(key, 0, 0, UIntPtr.Zero);
-            Thread.Sleep(60);
-            keybd_event(key, 0, 2, UIntPtr.Zero);
-        }).ConfigureAwait(false);
-    }
-
     private async Task SetVolume(long cid, string arg)
     {
-        arg = arg.Trim().ToLowerInvariant();
-        if (arg is "mute" or "0")
+        var a = arg.Trim().ToLowerInvariant();
+        if (a is "mute")
         {
-            await Exec("powershell -Command \"$ws=New-Object -ComObject WScript.Shell;$ws.SendKeys([char]173)\"").ConfigureAwait(false);
-            await SendHtml(cid, "🔇 Muted.").ConfigureAwait(false);
+            await Task.Run(() => VolumeService.MuteToggle()).ConfigureAwait(false);
+            await SendHtml(cid, $"Muted. Volume: <b>{VolumeService.GetPercent()}%</b>").ConfigureAwait(false);
             return;
         }
-        if (arg is "up" or "+10" or "down" or "-10")
+        if (a is "up" or "+10" or "+")
         {
-            bool up = arg.Contains("up") || arg.StartsWith("+");
-            await Exec($"powershell -Command \"$ws=New-Object -ComObject WScript.Shell;for($i=0;$i -lt 5;$i++){{$ws.SendKeys([char]{(up ? 175 : 174)})}}\"").ConfigureAwait(false);
-            await SendHtml(cid, up ? "🔊 Volume up." : "🔉 Volume down.").ConfigureAwait(false);
+            await Task.Run(() => VolumeService.StepUp(3)).ConfigureAwait(false);
+            await SendHtml(cid, $"Volume up: <b>{VolumeService.GetPercent()}%</b>").ConfigureAwait(false);
             return;
         }
-        var digits = new string(arg.Where(char.IsDigit).ToArray());
+        if (a is "down" or "-10" or "-")
+        {
+            await Task.Run(() => VolumeService.StepDown(3)).ConfigureAwait(false);
+            await SendHtml(cid, $"Volume down: <b>{VolumeService.GetPercent()}%</b>").ConfigureAwait(false);
+            return;
+        }
+        var digits = new string(a.Where(char.IsDigit).ToArray());
         if (int.TryParse(digits, out int vol))
         {
-            vol = Math.Clamp(vol, 0, 100);
-            // Точное значение — через CoreAudio (nircmd не требуем): ступенями к цели
-            await Exec($"powershell -Command \"$ws=New-Object -ComObject WScript.Shell;for($i=0;$i -lt 50;$i++){{$ws.SendKeys([char]174)}};for($i=0;$i -lt {(vol / 2)};$i++){{$ws.SendKeys([char]175)}}\"").ConfigureAwait(false);
-            await SendHtml(cid, $"🔊 Volume ≈ <b>{vol}%</b>").ConfigureAwait(false);
+            var set = await Task.Run(() => VolumeService.SetPercent(vol)).ConfigureAwait(false);
+            await SendHtml(cid, set >= 0
+                ? $"Volume: <b>{set}%</b>"
+                : "Volume control unavailable on this device.").ConfigureAwait(false);
         }
         else await SendHtml(cid, "Use: <code>0-100</code>, <code>up</code>, <code>down</code>, <code>mute</code>").ConfigureAwait(false);
     }
@@ -668,100 +674,48 @@ public sealed class TelegramBotService : IDisposable
     private async Task SetBrightness(long cid, string arg)
     {
         var digits = new string(arg.Where(char.IsDigit).ToArray());
-        if (int.TryParse(digits, out int b) && b >= 0 && b <= 100)
+        if (!int.TryParse(digits, out int b))
         {
-            await Exec($"powershell (Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods).WmiSetBrightness(1,{b})").ConfigureAwait(false);
-            await SendHtml(cid, $"🔆 Brightness: <b>{b}%</b>").ConfigureAwait(false);
+            await SendHtml(cid, "Use: <code>0-100</code>").ConfigureAwait(false);
+            return;
         }
-        else await SendHtml(cid, "Use: <code>0-100</code>").ConfigureAwait(false);
+        var (ok, msg) = await BrightnessService.SetAsync(b).ConfigureAwait(false);
+        await SendHtml(cid, ok ? $"<b>{Esc(msg)}</b>" : Esc(msg)).ConfigureAwait(false);
     }
 
     private async Task OpenApp(long cid, string name)
     {
-        name = name.Trim().Trim('"');
-        if (name.Length == 0) { await SendHtml(cid, "Enter app name.").ConfigureAwait(false); return; }
-        try
-        {
-            var n = name.Replace(".exe", "").Trim();
-            if (Process.GetProcessesByName(n).Length > 0)
-            {
-                await SendHtml(cid, $"ℹ️ <code>{Esc(n)}</code> is already running.").ConfigureAwait(false);
-                return;
-            }
-            Process.Start(new ProcessStartInfo(name) { UseShellExecute = true });
-            await SendHtml(cid, $"🚀 Opening <code>{Esc(name)}</code>…").ConfigureAwait(false);
-        }
-        catch
-        {
-            foreach (var path in new[]
-            {
-                @"C:\Program Files", @"C:\Program Files (x86)",
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)
-            })
-            {
-                try
-                {
-                    if (!Directory.Exists(path)) continue;
-                    var files = Directory.EnumerateFiles(path, "*.exe", SearchOption.AllDirectories)
-                        .Where(f => Path.GetFileName(f).Contains(name.Replace(".exe", ""),
-                            StringComparison.OrdinalIgnoreCase)).Take(2).ToList();
-                    foreach (var f in files)
-                    {
-                        Process.Start(new ProcessStartInfo(f) { UseShellExecute = true });
-                        await SendHtml(cid, $"🚀 Opened: <code>{Esc(Path.GetFileName(f))}</code>").ConfigureAwait(false);
-                        return;
-                    }
-                }
-                catch { }
-            }
-            await SendHtml(cid, $"❌ Not found: <code>{Esc(name)}</code>").ConfigureAwait(false);
-        }
+        await SendHtml(cid, "<i>Opening…</i>").ConfigureAwait(false);
+        var res = await RemoteActions.OpenAppAsync(name).ConfigureAwait(false);
+        await SendHtml(cid, Esc(res)).ConfigureAwait(false);
     }
 
     private async Task KillProcess(long cid, string name)
     {
-        try
-        {
-            var n = name.Replace(".exe", "").Trim();
-            if (n.Length == 0) { await SendHtml(cid, "Enter process name.").ConfigureAwait(false); return; }
-            if (SelfProtection.IsProtectedProcess(n))
-            {
-                await SendHtml(cid, $"🛡 Protected system process <code>{Esc(n)}</code> — refused.").ConfigureAwait(false);
-                return;
-            }
-            var procs = Process.GetProcessesByName(n);
-            if (procs.Length == 0)
-            {
-                await SendHtml(cid, $"🔍 Not found: <code>{Esc(n)}</code>").ConfigureAwait(false);
-                return;
-            }
-            foreach (var p in procs) { try { p.Kill(); } catch { } p.Dispose(); }
-            await SendHtml(cid, $"✅ Terminated <b>{Esc(n)}</b> ({procs.Length}).").ConfigureAwait(false);
-        }
-        catch (Exception ex) { await SendHtml(cid, $"⚠️ Terminate error: <code>{Esc(Trim(ex.Message, 200))}</code>").ConfigureAwait(false); }
+        var res = await RemoteActions.KillProcessAsync(name).ConfigureAwait(false);
+        await SendHtml(cid, Esc(res)).ConfigureAwait(false);
     }
 
     private async Task SendWelcome(long cid)
     {
-        var kb = MainKeyboard();
         await _botClient!.SendTextMessageAsync(cid,
-            $"🛡 <b>SystemGuard Remote</b>\n🖥 <code>{Esc(Environment.MachineName)}</code>\n\n" +
-            "Pick a button below or open the <b>Web App</b> for the full dashboard.\n" +
+            $"<b>SystemGuard Remote</b>\n<code>{Esc(Environment.MachineName)}</code>\n\n" +
+            "Pick a button below, open the <b>Web App</b> for the full panel,\n" +
+            "or /live for live in-app screen and camera.\n" +
             "<i>/help — all commands</i>",
-            parseMode: ParseMode.Html, replyMarkup: kb).ConfigureAwait(false);
+            parseMode: ParseMode.Html, replyMarkup: MainKeyboard()).ConfigureAwait(false);
     }
 
     private static ReplyKeyboardMarkup MainKeyboard() => new(new[]
     {
-        new[] { new KeyboardButton("🖥 Status"), new KeyboardButton("📊 Processes"), new KeyboardButton("📱 Apps") },
-        new[] { new KeyboardButton("🔊 Volume"), new KeyboardButton("🔆 Brightness"), new KeyboardButton("📸 Screenshot") },
-        new[] { new KeyboardButton("📡 Stream"), new KeyboardButton("📷 Cam"), new KeyboardButton("📂 Files") },
-        new[] { new KeyboardButton("🔌 Shutdown"), new KeyboardButton("🔄 Restart"), new KeyboardButton("🌙 Sleep") },
-        new[] { new KeyboardButton("🧹 Clean"), new KeyboardButton("⚡ Optimize RAM"), new KeyboardButton("💻 CMD") },
-        new[] { new KeyboardButton("🚀 Open App"), new KeyboardButton("❌ Close App"), new KeyboardButton("🔒 Lock") },
-        new[] { new KeyboardButton("⭐ License"), new KeyboardButton("❓ Help") },
-        new[] { new KeyboardButton("🌐 Web App") { WebApp = new WebAppInfo { Url = "https://marik1337leet.github.io/systemguard-miniapp" } } }
+        new[] { new KeyboardButton("Status"), new KeyboardButton("Processes"), new KeyboardButton("Apps") },
+        new[] { new KeyboardButton("Volume"), new KeyboardButton("Brightness"), new KeyboardButton("Screenshot") },
+        new[] { new KeyboardButton("Stream"), new KeyboardButton("Cam"), new KeyboardButton("Files") },
+        new[] { new KeyboardButton("Shutdown"), new KeyboardButton("Restart"), new KeyboardButton("Sleep") },
+        new[] { new KeyboardButton("Clean"), new KeyboardButton("Optimize RAM"), new KeyboardButton("CMD") },
+        new[] { new KeyboardButton("Open App"), new KeyboardButton("Close App"), new KeyboardButton("Lock") },
+        new[] { new KeyboardButton("Live"), new KeyboardButton("License"), new KeyboardButton("Help") },
+        new[] { new KeyboardButton("Web App") { WebApp = new WebAppInfo { Url = "https://marik1337leet.github.io/systemguard-miniapp" } } }
     })
     { ResizeKeyboard = true };
 
@@ -769,30 +723,30 @@ public sealed class TelegramBotService : IDisposable
     {
         try
         {
-            await _botClient!.SendTextMessageAsync(cid, "⌨️ <i>Choose an action:</i>",
+            await _botClient!.SendTextMessageAsync(cid, "<i>Choose an action:</i>",
                 parseMode: ParseMode.Html, replyMarkup: MainKeyboard()).ConfigureAwait(false);
         }
         catch { }
     }
 
     private async Task SendHelp(long cid) => await SendHtml(cid,
-        "📖 <b>Commands</b>\n\n" +
-        "🖥 <code>/status</code> — system card\n" +
-        "📊 <code>/processes</code> • 📱 <code>/apps</code>\n" +
-        "📸 <code>/screenshot</code> • 📡 <code>/stream</code> • <code>/stop</code> • 📷 <code>/cam</code>\n" +
-        "📂 <code>/ls C:\\</code> • <code>/get C:\\file</code>\n" +
-        "🔌 <code>/shutdown</code> • 🔄 <code>/restart</code> • <code>/cancel</code>\n" +
-        "🌙 <code>/sleep</code> • 🔒 <code>/lock</code>\n" +
-        "🚀 <code>/open chrome</code> • ❌ <code>/close notepad</code>\n" +
-        "💻 <code>/cmd ipconfig</code>\n" +
-        "🔊 <code>/volume 70</code> • 🔆 <code>/brightness 70</code> • ⏯ <code>/play /next /prev /mute</code>\n" +
-        "🧹 <code>/clean</code> • ⚡ <code>/optimize_ram</code>\n" +
-        "🌐 <code>/ip</code> • 📶 <code>/ping</code> • ⏱ <code>/uptime</code>\n" +
-        "🔋 <code>/battery</code> • 💾 <code>/free</code> • 👥 <code>/users</code>\n" +
-        "⭐ <code>/license</code>\n\n" +
-        "<i>Tip: arguments work in one line, e.g. <code>/ls C:\\Games</code></i>").ConfigureAwait(false);
+        "<b>Commands</b>\n\n" +
+        "<code>/status</code> — system card\n" +
+        "<code>/live</code> — live in-app access\n" +
+        "<code>/processes</code> • <code>/apps</code>\n" +
+        "<code>/screenshot</code> • <code>/stream</code> • <code>/stop</code> • <code>/cam</code>\n" +
+        "<code>/ls C:\\</code> • <code>/get C:\\file</code>\n" +
+        "<code>/shutdown</code> • <code>/restart</code> • <code>/cancel</code>\n" +
+        "<code>/sleep</code> • <code>/lock</code>\n" +
+        "<code>/open chrome</code> • <code>/close notepad</code>\n" +
+        "<code>/cmd ipconfig</code>\n" +
+        "<code>/volume 70</code> • <code>/brightness 70</code> • <code>/play /next /prev /mute</code>\n" +
+        "<code>/clean</code> • <code>/ram</code>\n" +
+        "<code>/ip</code> • <code>/ping</code> • <code>/uptime</code>\n" +
+        "<code>/battery</code> • <code>/free</code> • <code>/users</code>\n" +
+        "<code>/license</code>\n\n" +
+        "<i>Arguments work inline, e.g. <code>/ls C:\\Games</code></i>").ConfigureAwait(false);
 
-    // ── Файлы ───────────────────────────────────────────────────────────────────
     private async Task ListDir(long cid, string dir)
     {
         try
@@ -802,12 +756,12 @@ public sealed class TelegramBotService : IDisposable
             dir = dir.Trim().Trim('"');
             if (SelfProtection.IsProtectedPath(dir) && dir.TrimEnd('\\').Equals(SelfProtection.DataDirectory, StringComparison.OrdinalIgnoreCase))
             {
-                await SendHtml(cid, "🛡 SystemGuard data folder is hidden.").ConfigureAwait(false);
+                await SendHtml(cid, "SystemGuard data folder is hidden.").ConfigureAwait(false);
                 return;
             }
             if (!Directory.Exists(dir))
             {
-                await SendHtml(cid, $"📁 Not a folder: <code>{Esc(dir)}</code>").ConfigureAwait(false);
+                await SendHtml(cid, $"Not a folder: <code>{Esc(dir)}</code>").ConfigureAwait(false);
                 return;
             }
             var entries = Directory.GetFileSystemEntries(dir).Take(30)
@@ -815,15 +769,15 @@ public sealed class TelegramBotService : IDisposable
                 {
                     try
                     {
-                        if (Directory.Exists(e)) return "📁 <code>" + Esc(Path.GetFileName(e)) + "</code>/";
+                        if (Directory.Exists(e)) return Esc(Path.GetFileName(e)) + "/";
                         var fi = new FileInfo(e);
-                        return "📄 <code>" + Esc(Path.GetFileName(e)) + "</code> <i>" + fi.Length / 1024 + " KB</i>";
+                        return Esc(Path.GetFileName(e)) + $" ({fi.Length / 1024} KB)";
                     }
-                    catch { return "📄 <code>" + Esc(Path.GetFileName(e)) + "</code>"; }
+                    catch { return Esc(Path.GetFileName(e)); }
                 });
-            await SendHtml(cid, $"📁 <code>{Esc(dir)}</code>\n{string.Join("\n", entries)}").ConfigureAwait(false);
+            await SendHtml(cid, $"<code>{Esc(dir)}</code>\n{string.Join("\n", entries)}").ConfigureAwait(false);
         }
-        catch (Exception ex) { await SendHtml(cid, $"⚠️ List error: <code>{Esc(Trim(ex.Message, 300))}</code>").ConfigureAwait(false); }
+        catch (Exception ex) { await SendHtml(cid, $"List error: <code>{Esc(Trim(ex.Message, 300))}</code>").ConfigureAwait(false); }
     }
 
     private async Task SendFileToChat(long cid, string path)
@@ -833,58 +787,22 @@ public sealed class TelegramBotService : IDisposable
             path = path.Trim().Trim('"');
             if (!File.Exists(path))
             {
-                await SendHtml(cid, "❌ File not found.").ConfigureAwait(false);
+                await SendHtml(cid, "File not found.").ConfigureAwait(false);
                 return;
             }
             var info = new FileInfo(path);
             if (info.Length > 49L * 1024 * 1024)
             {
-                await SendHtml(cid, "❌ File over 50 MB (Bot API limit).").ConfigureAwait(false);
+                await SendHtml(cid, "File over 50 MB (Bot API limit).").ConfigureAwait(false);
                 return;
             }
             await using var s = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             await ThrottledSend(cid, (c, ct) =>
                 _botClient!.SendDocumentAsync(c, InputFile.FromStream(s, info.Name),
-                    caption: $"📄 <b>{Esc(info.Name)}</b> ({info.Length / 1024} KB)",
-                    parseMode: ParseMode.Html, cancellationToken: ct)).ConfigureAwait(false);
+                    caption: $"{Esc(info.Name)} ({info.Length / 1024} KB)",
+                    cancellationToken: ct)).ConfigureAwait(false);
         }
-        catch (Exception ex) { await SendHtml(cid, $"⚠️ Send error: <code>{Esc(Trim(ex.Message, 300))}</code>").ConfigureAwait(false); }
-    }
-
-    // ── Скриншот/стрим ──────────────────────────────────────────────────────────
-    [DllImport("user32.dll")] private static extern int GetSystemMetrics(int nIndex);
-    private const int SM_XVIRTUALSCREEN = 76, SM_YVIRTUALSCREEN = 77, SM_CXVIRTUALSCREEN = 78, SM_CYVIRTUALSCREEN = 79;
-
-    private static byte[] CaptureScreenJpeg(int maxWidth = 1120, int quality = 50)
-    {
-        int vx, vy, vw, vh;
-        try
-        {
-            vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
-            vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
-            vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-            vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
-            if (vw <= 0 || vh <= 0) { vx = 0; vy = 0; vw = 1920; vh = 1080; }
-        }
-        catch { vx = 0; vy = 0; vw = 1920; vh = 1080; }
-
-        double scale = vw > maxWidth ? (double)maxWidth / vw : 1.0;
-        int w = Math.Max(320, (int)(vw * scale));
-        int h = Math.Max(200, (int)(vh * scale));
-
-        using var bmp = new System.Drawing.Bitmap(w, h);
-        using (var g = System.Drawing.Graphics.FromImage(bmp))
-            g.CopyFromScreen(vx, vy, 0, 0, new System.Drawing.Size(w, h),
-                System.Drawing.CopyPixelOperation.SourceCopy);
-
-        var enc = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders()
-            .First(c => c.MimeType == "image/jpeg");
-        var prm = new System.Drawing.Imaging.EncoderParameters(1);
-        prm.Param[0] = new System.Drawing.Imaging.EncoderParameter(
-            System.Drawing.Imaging.Encoder.Quality, quality);
-        using var ms = new MemoryStream();
-        bmp.Save(ms, enc, prm);
-        return ms.ToArray();
+        catch (Exception ex) { await SendHtml(cid, $"Send error: <code>{Esc(Trim(ex.Message, 300))}</code>").ConfigureAwait(false); }
     }
 
     private readonly Dictionary<long, CancellationTokenSource> _streams = new();
@@ -895,7 +813,7 @@ public sealed class TelegramBotService : IDisposable
         lock (_streamLock)
         {
             StopScreenStream(cid);
-            var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5)); // автостоп от флуда
+            var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
             _streams[cid] = cts;
             _ = Task.Run(() => StreamLoopAsync(cid, cts.Token));
         }
@@ -920,10 +838,7 @@ public sealed class TelegramBotService : IDisposable
         {
             while (!ct.IsCancellationRequested)
             {
-                byte[]? jpg = null;
-                try { jpg = await Task.Run(() => CaptureScreenJpeg(), ct).ConfigureAwait(false); }
-                catch (OperationCanceledException) { break; }
-                catch { jpg = null; }
+                var jpg = await ScreenCaptureService.CaptureScreenJpegAsync(960, 45, ct).ConfigureAwait(false);
                 if (jpg == null)
                 {
                     try { await Task.Delay(3000, ct).ConfigureAwait(false); } catch (OperationCanceledException) { break; }
@@ -934,11 +849,11 @@ public sealed class TelegramBotService : IDisposable
                     using var ms = new MemoryStream(jpg);
                     await ThrottledSend(cid, (c, tok) =>
                         _botClient!.SendPhotoAsync(c, InputFile.FromStream(ms, "live.jpg"),
-                            caption: "📡 <i>Live — /stop to end</i>", parseMode: ParseMode.Html,
+                            caption: "Live — /stop to end",
                             cancellationToken: tok)).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) { break; }
-                catch { /* флуд/таймаут — просто ждём следующий кадр */ }
+                catch { }
                 try { await Task.Delay(2500, ct).ConfigureAwait(false); } catch (OperationCanceledException) { break; }
             }
         }
@@ -946,60 +861,24 @@ public sealed class TelegramBotService : IDisposable
         finally { lock (_streamLock) _streams.Remove(cid); }
     }
 
-    // ── Вебкамера (best-effort) ─────────────────────────────────────────────────
-    [DllImport("avicap32.dll", CharSet = CharSet.Ansi)]
-    private static extern IntPtr capCreateCaptureWindowA(string name, int style, int x, int y, int w, int h, IntPtr parent, int id);
-    [DllImport("user32.dll", CharSet = CharSet.Auto)] private static extern IntPtr SendMessage(IntPtr h, int msg, int w, string? l);
-    [DllImport("user32.dll")] private static extern bool DestroyWindow(IntPtr h);
-    [DllImport("user32.dll")] private static extern IntPtr GetDesktopWindow();
-    private const int WM_CAP_DRIVER_CONNECT = 0x40A, WM_CAP_DRIVER_DISCONNECT = 0x40B, WM_CAP_FILE_SAVEDIB = 0x415;
-    private const int WS_CHILD = 0x40000000, WS_VISIBLE = 0x10000000;
-
-    private static string? CaptureWebcam(string outPath)
-    {
-        IntPtr hwnd = IntPtr.Zero;
-        try
-        {
-            hwnd = capCreateCaptureWindowA("sgcap", WS_CHILD | WS_VISIBLE, 0, 0, 640, 480, GetDesktopWindow(), 0);
-            if (hwnd == IntPtr.Zero) return null;
-            if (SendMessage(hwnd, WM_CAP_DRIVER_CONNECT, 0, null) == IntPtr.Zero) return null;
-            if (SendMessage(hwnd, WM_CAP_FILE_SAVEDIB, 0, outPath) == IntPtr.Zero) return null;
-            return File.Exists(outPath) ? outPath : null;
-        }
-        catch { return null; }
-        finally
-        {
-            try
-            {
-                if (hwnd != IntPtr.Zero)
-                {
-                    SendMessage(hwnd, WM_CAP_DRIVER_DISCONNECT, 0, null);
-                    DestroyWindow(hwnd);
-                }
-            }
-            catch { }
-        }
-    }
-
     private async Task SendWebcamToChat(long cid)
     {
-        var tmp = Path.Combine(Path.GetTempPath(), $"sgcam_{Guid.NewGuid():N}.bmp");
+        await SendHtml(cid, "<i>Capturing camera…</i>").ConfigureAwait(false);
+        var (jpg, err) = await WebcamService.CaptureJpegAsync().ConfigureAwait(false);
+        if (jpg == null)
+        {
+            await SendHtml(cid, $"Camera unavailable: <code>{Esc(err)}</code>").ConfigureAwait(false);
+            return;
+        }
         try
         {
-            await SendHtml(cid, "📷 <i>Capturing camera…</i>").ConfigureAwait(false);
-            var shot = await Task.Run(() => CaptureWebcam(tmp)).ConfigureAwait(false);
-            if (shot == null)
-            {
-                await SendHtml(cid, "📷 Camera unavailable (no webcam / busy / no driver).").ConfigureAwait(false);
-                return;
-            }
-            await using var s = File.Open(shot, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var ms = new MemoryStream(jpg);
             await ThrottledSend(cid, (c, ct) =>
-                _botClient!.SendPhotoAsync(c, InputFile.FromStream(s, "cam.bmp"),
-                    caption: "📷 <b>Webcam</b>", parseMode: ParseMode.Html, cancellationToken: ct)).ConfigureAwait(false);
+                _botClient!.SendPhotoAsync(c, InputFile.FromStream(ms, "cam.jpg"),
+                    caption: $"Webcam • {DateTime.Now:HH:mm:ss}",
+                    cancellationToken: ct)).ConfigureAwait(false);
         }
-        catch (Exception ex) { await SendHtml(cid, $"⚠️ Camera error: <code>{Esc(Trim(ex.Message, 200))}</code>").ConfigureAwait(false); }
-        finally { try { File.Delete(tmp); } catch { } }
+        catch { await SendHtml(cid, "Camera upload failed.").ConfigureAwait(false); }
     }
 
     private async Task SendRunningApps(long cid)
@@ -1016,7 +895,7 @@ public sealed class TelegramBotService : IDisposable
                 try { p.Dispose(); } catch { }
                 return (t, mem);
             }).ToList()).ConfigureAwait(false);
-        await SendHtml(cid, "📱 <b>Running apps</b>\n" +
+        await SendHtml(cid, "<b>Running apps</b>\n" +
             string.Join("\n", procs.Select(p => $"• <code>{Esc(p.t)}</code> — {Esc(p.mem)}"))).ConfigureAwait(false);
     }
 
@@ -1046,14 +925,13 @@ public sealed class TelegramBotService : IDisposable
 
     private async Task ExecuteAndSend(long cid, string cmd)
     {
-        await SendHtml(cid, $"💻 <code>{Esc(Trim(cmd, 200))}</code>\n<i>Running…</i>").ConfigureAwait(false);
+        await SendHtml(cid, $"<code>{Esc(Trim(cmd, 200))}</code>\n<i>Running…</i>").ConfigureAwait(false);
         var r = await Exec(cmd).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(r)) r = "(no output)";
         if (r.Length > 3800) r = r[..3800] + "\n…(truncated)";
-        await SendHtml(cid, $"💻 <code>{Esc(Trim(cmd, 200))}</code>\n<pre>{Esc(r)}</pre>").ConfigureAwait(false);
+        await SendHtml(cid, $"<code>{Esc(Trim(cmd, 200))}</code>\n<pre>{Esc(r)}</pre>").ConfigureAwait(false);
     }
 
-    // ── Шлюз отправки ───────────────────────────────────────────────────────────
     private async Task ThrottledSend(long cid, Func<long, CancellationToken, Task> send)
     {
         await _sendGate.WaitAsync().ConfigureAwait(false);
@@ -1092,7 +970,7 @@ public sealed class TelegramBotService : IDisposable
                 _botClient!.SendTextMessageAsync(chat, c, parseMode: ParseMode.Html,
                     linkPreviewOptions: new LinkPreviewOptions { IsDisabled = true },
                     replyMarkup: markup, cancellationToken: ct)).ConfigureAwait(false);
-            markup = null; // клавиатура только в первом чанке
+            markup = null;
         }
     }
 
@@ -1131,17 +1009,17 @@ public sealed class TelegramBotService : IDisposable
             Directory.CreateDirectory(dp);
             if (msg.Document != null)
             {
-                await SendHtml(c, "📥 <i>Downloading…</i>").ConfigureAwait(false);
+                await SendHtml(c, "<i>Downloading…</i>").ConfigureAwait(false);
                 var f = await _botClient!.GetFileAsync(msg.Document.FileId).ConfigureAwait(false);
                 var safe = string.Concat((msg.Document.FileName ?? "file").Split(Path.GetInvalidFileNameChars()));
                 var p = Path.Combine(dp, string.IsNullOrWhiteSpace(safe) ? "file" : safe);
                 var bytes = await _http.GetByteArrayAsync($"https://api.telegram.org/file/bot{_token}/{f.FilePath}").ConfigureAwait(false);
                 await File.WriteAllBytesAsync(p, bytes).ConfigureAwait(false);
-                await SendHtml(c, $"✅ Saved to PC:\n<code>{Esc(p)}</code>").ConfigureAwait(false);
+                await SendHtml(c, $"Saved to PC:\n<code>{Esc(p)}</code>").ConfigureAwait(false);
             }
-            else await SendHtml(c, "📷 Photo received — send as <b>file/document</b> to save it on PC.").ConfigureAwait(false);
+            else await SendHtml(c, "Photo received — send as <b>file/document</b> to save it on PC.").ConfigureAwait(false);
         }
-        catch (Exception ex) { await SendHtml(c, $"⚠️ Upload error: <code>{Esc(Trim(ex.Message, 200))}</code>").ConfigureAwait(false); }
+        catch (Exception ex) { await SendHtml(c, $"Upload error: <code>{Esc(Trim(ex.Message, 200))}</code>").ConfigureAwait(false); }
     }
 
     private async Task ScheduleChecker(CancellationToken ct)
@@ -1174,7 +1052,7 @@ public sealed class TelegramBotService : IDisposable
                 if (_notifyEnabled)
                 {
                     foreach (var d in DriveInfo.GetDrives().Where(d => d.IsReady && d.TotalFreeSpace / 1073741824.0 < 5))
-                        await SendMessage($"⚠️ Warning: low disk space on {d.Name}").ConfigureAwait(false);
+                        await SendMessage($"Warning: low disk space on {d.Name}").ConfigureAwait(false);
                 }
                 await Task.Delay(TimeSpan.FromMinutes(5), ct).ConfigureAwait(false);
             }
@@ -1184,19 +1062,19 @@ public sealed class TelegramBotService : IDisposable
     }
 
     private async Task ShowLicenseMenu(long cid) => await _botClient!.SendTextMessageAsync(cid,
-        "⭐ <b>SystemGuard Pro</b>\n\n" +
-        "📅 Monthly — <b>300 ★</b>\n" +
-        "🗓 Half-Year — <b>1000 ★</b>\n" +
-        "🎆 Yearly — <b>1800 ★</b>\n" +
-        "💎 Lifetime — <b>3000 ★</b>\n\n" +
+        "<b>SystemGuard Pro</b>\n\n" +
+        "Monthly — <b>300 Stars</b>\n" +
+        "Half-Year — <b>1000 Stars</b>\n" +
+        "Yearly — <b>1800 Stars</b>\n" +
+        "Lifetime — <b>3000 Stars</b>\n\n" +
         "<i>After payment the bot sends an activation key — paste it in the app (License tab).</i>",
         parseMode: ParseMode.Html,
         replyMarkup: new InlineKeyboardMarkup(new[]
         {
-            new[] { InlineKeyboardButton.WithCallbackData("📅 Monthly — 300 ★", "buy_monthly") },
-            new[] { InlineKeyboardButton.WithCallbackData("🗓 Half-Year — 1000 ★", "buy_halfyear") },
-            new[] { InlineKeyboardButton.WithCallbackData("🎆 Yearly — 1800 ★", "buy_yearly") },
-            new[] { InlineKeyboardButton.WithCallbackData("💎 Lifetime — 3000 ★", "buy_lifetime") },
+            new[] { InlineKeyboardButton.WithCallbackData("Monthly — 300 Stars", "buy_monthly") },
+            new[] { InlineKeyboardButton.WithCallbackData("Half-Year — 1000 Stars", "buy_halfyear") },
+            new[] { InlineKeyboardButton.WithCallbackData("Yearly — 1800 Stars", "buy_yearly") },
+            new[] { InlineKeyboardButton.WithCallbackData("Lifetime — 3000 Stars", "buy_lifetime") },
         })).ConfigureAwait(false);
 
     private async Task HandleCallback(string? d, long cid)
@@ -1211,16 +1089,22 @@ public sealed class TelegramBotService : IDisposable
         }
     }
 
+    // Stars: currency XTR, providerToken не передаём вообще (иначе PAYMENT_PROVIDER_INVALID)
     private async Task SendInvoice(long cid, string n, int s, int m)
     {
         try
         {
-            await _botClient!.SendInvoiceAsync(cid, $"SG Pro — {n}", $"Pro license: {n.ToLower()}",
-                $"{n}|{m}", "XTR", new[] { new LabeledPrice($"Pro {n}", s) }).ConfigureAwait(false);
+            await _botClient!.SendInvoiceAsync(
+                chatId: cid,
+                title: $"SG Pro — {n}",
+                description: $"Pro license: {n.ToLower()}",
+                payload: $"{n}|{m}",
+                currency: "XTR",
+                prices: new[] { new LabeledPrice($"Pro {n}", s) }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            await SendHtml(cid, $"⚠️ Invoice failed: <code>{Esc(Trim(ex.Message, 200))}</code>").ConfigureAwait(false);
+            await SendHtml(cid, $"Invoice failed: <code>{Esc(Trim(ex.Message, 200))}</code>").ConfigureAwait(false);
         }
     }
 
@@ -1235,7 +1119,7 @@ public sealed class TelegramBotService : IDisposable
             var exp = m >= 999 ? DateTime.Now.AddYears(99) : DateTime.Now.AddMonths(m);
             var plan = m >= 999 ? "Lifetime" : planName;
             await _botClient!.SendTextMessageAsync(msg.Chat.Id,
-                $"✅ <b>Paid! Thank you!</b>\n\nActivate in the app (License tab):\n🔑 Key: <code>{GenerateKey("Pro", exp, plan)}</code>\n📅 Valid until {exp:dd MMM yyyy}",
+                $"<b>Paid! Thank you!</b>\n\nActivate in the app (License tab):\nKey: <code>{GenerateKey("Pro", exp, plan)}</code>\nValid until {exp:dd MMM yyyy}",
                 parseMode: ParseMode.Html).ConfigureAwait(false);
         }
         catch { }
@@ -1255,15 +1139,11 @@ public sealed class TelegramBotService : IDisposable
 
     private async Task SendScreenshotToChat(long cid)
     {
-        await SendHtml(cid, "📸 <i>Capturing screen…</i>").ConfigureAwait(false);
-        var jpg = await Task.Run(() =>
-        {
-            try { return CaptureScreenJpeg(); }
-            catch { return null; }
-        }).ConfigureAwait(false);
+        await SendHtml(cid, "<i>Capturing screen…</i>").ConfigureAwait(false);
+        var jpg = await ScreenCaptureService.CaptureScreenJpegAsync().ConfigureAwait(false);
         if (jpg == null)
         {
-            await SendHtml(cid, "📸 Screenshot failed (no desktop / driver error).").ConfigureAwait(false);
+            await SendHtml(cid, "Screenshot failed (no desktop / driver error).").ConfigureAwait(false);
             return;
         }
         try
@@ -1271,10 +1151,10 @@ public sealed class TelegramBotService : IDisposable
             using var ms = new MemoryStream(jpg);
             await ThrottledSend(cid, (c, ct) =>
                 _botClient!.SendPhotoAsync(c, InputFile.FromStream(ms, "ss.jpg"),
-                    caption: $"📸 <b>{Esc(Environment.MachineName)}</b> • {DateTime.Now:HH:mm:ss}",
-                    parseMode: ParseMode.Html, cancellationToken: ct)).ConfigureAwait(false);
+                    caption: $"{Esc(Environment.MachineName)} • {DateTime.Now:HH:mm:ss}",
+                    cancellationToken: ct)).ConfigureAwait(false);
         }
-        catch { await SendHtml(cid, "📸 Screenshot upload failed.").ConfigureAwait(false); }
+        catch { await SendHtml(cid, "Screenshot upload failed.").ConfigureAwait(false); }
     }
 
     public async Task<string> SendScreenshot()
@@ -1283,11 +1163,7 @@ public sealed class TelegramBotService : IDisposable
         {
             if (_botClient == null || !IsConfigured) return "ERR: bot not configured";
             if (!long.TryParse(_chatId, out var id)) return "ERR: bad chat id";
-            var jpg = await Task.Run(() =>
-            {
-                try { return CaptureScreenJpeg(); }
-                catch { return null; }
-            }).ConfigureAwait(false);
+            var jpg = await ScreenCaptureService.CaptureScreenJpegAsync().ConfigureAwait(false);
             if (jpg == null) return "ERR: capture failed";
             try
             {
@@ -1302,7 +1178,6 @@ public sealed class TelegramBotService : IDisposable
         catch (Exception ex) { return $"ERR: {Trim(ex.Message.Split('\n')[0], 200)}"; }
     }
 
-    // ── Публичное API для вкладки Telegram ──────────────────────────────────────
     public bool IsStreaming { get { lock (_streamLock) return _streams.Count > 0; } }
 
     public string StartStreamToConfigured()
@@ -1318,9 +1193,11 @@ public sealed class TelegramBotService : IDisposable
         return "All streams stopped";
     }
 
-    public Task SendWebcamToConfigured() =>
-        IsConfigured && long.TryParse(_chatId, out var id)
-            ? SendWebcamToChat(id) : Task.CompletedTask;
+    public async Task SendWebcamToConfigured()
+    {
+        if (!IsConfigured || !long.TryParse(_chatId, out var id)) return;
+        await SendWebcamToChat(id).ConfigureAwait(false);
+    }
 
     public Task SendFileToConfigured(string path) =>
         IsConfigured && long.TryParse(_chatId, out var id) && !string.IsNullOrWhiteSpace(path)

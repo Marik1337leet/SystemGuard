@@ -49,6 +49,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         RefreshLicenseInfo();
         NavigateTo("dashboard");
         StartWebSocket();
+        StartLiveServer();
         OverlayManager.RestoreAtStartup();
     }
 
@@ -110,6 +111,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         try { _wsServer = new WebSocketServer(); _wsServer.Start(8888); }
         catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[WS] {ex.Message}"); }
+    }
+
+    // Локальный HTTP API для WebApp live-режима (localhost всегда, без сюрпризов)
+    private void StartLiveServer()
+    {
+        try { LiveServices.StartServer(); }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[Live] {ex.Message}"); }
     }
 
     // ── Menu ──────────────────────────────────────────────────────────────────
@@ -235,6 +243,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _settingsVM?.OnDeactivated();
         _wsServer?.Stop();
         _wsServer?.Dispose();
+        LiveServices.StopAll();
         OverlayManager.Shutdown();
     }
 

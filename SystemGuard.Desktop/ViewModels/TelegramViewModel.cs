@@ -25,6 +25,11 @@ public partial class TelegramViewModel : ViewModelBase
     [ObservableProperty] private bool _isStreaming;
     [ObservableProperty] private string _newUserId = "";
     [ObservableProperty] private bool _newUserAdmin;
+    [ObservableProperty] private string _liveStatus = "Live access is off";
+    [ObservableProperty] private string _liveUrl = "";
+    [ObservableProperty] private string _liveToken = "";
+    [ObservableProperty] private bool _isLiveRunning;
+    [ObservableProperty] private bool _isLiveBusy;
 
     public IRelayCommand ConnectCommand { get; }
     public IRelayCommand DisconnectCommand { get; }
@@ -39,6 +44,8 @@ public partial class TelegramViewModel : ViewModelBase
     public IRelayCommand SendFileCommand { get; }
     public IRelayCommand AddUserCommand { get; }
     public IRelayCommand<string> RemoveUserCommand { get; }
+    public IRelayCommand PublishLiveCommand { get; }
+    public IRelayCommand StopLiveCommand { get; }
 
     public TelegramViewModel()
     {
@@ -57,7 +64,11 @@ public partial class TelegramViewModel : ViewModelBase
         SendFileCommand = new AsyncRelayCommand(SendFile);
         AddUserCommand = new RelayCommand(AddUser);
         RemoveUserCommand = new RelayCommand<string>(RemoveUser);
+        PublishLiveCommand = new AsyncRelayCommand(PublishLiveAsync);
+        StopLiveCommand = new RelayCommand(StopLive);
 
+        LiveServices.Tunnel.Changed += RefreshLiveState;
+        RefreshLiveState();
         LoadConfig();
     }
 
@@ -115,7 +126,7 @@ public partial class TelegramViewModel : ViewModelBase
             var config = new BotConfig { Token = BotToken, ChatId = ChatId };
             File.WriteAllText(_configPath, JsonSerializer.Serialize(config));
             StatusText = "Config saved!";
-            AddLog("💾 Config saved");
+            AddLog("Config saved");
         }
         catch (Exception ex)
         {
@@ -212,6 +223,68 @@ public partial class TelegramViewModel : ViewModelBase
     {
         LogMessages.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {message}");
         if (LogMessages.Count > 50) LogMessages.RemoveAt(LogMessages.Count - 1);
+    }
+
+    // ── Live-доступ для WebApp (Cloudflare Tunnel → локальный HTTP API) ──────
+    private void RefreshLiveState()
+    {
+        var t = LiveServices.Tunnel;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            IsLiveRunning = t.IsRunning;
+            LiveUrl = t.PublicUrl ?? "";
+            LiveToken = LiveServices.Token;
+            LiveStatus = t.IsRunning
+                ? "Live: " + (t.PublicUrl ?? "")
+                : t.Status == "Stopped" ? "Live access is off" : t.Status;
+            IsLiveBusy = false;
+        });
+    }
+
+    private async Task PublishLiveAsync()
+    {
+        if (IsLiveBusy || IsLiveRunning) return;
+        IsLiveBusy = true;
+        LiveStatus = "Preparing live access…";
+        try
+        {
+            LiveServices.StartServer();
+            var bin = await LiveServices.Tunnel.EnsureBinaryAsync(
+                new Progress<string>(m => LiveStatus = m)).ConfigureAwait(false);
+            if (!bin.Ok)
+            {
+                var msg = bin.Message;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    LiveStatus = msg;
+                    AddLog(msg);
+                    IsLiveBusy = false;
+                });
+                return;
+            }
+            var (ok, msg2) = await LiveServices.Tunnel.StartAsync(RemoteHttpServer.Port).ConfigureAwait(false);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                AddLog(msg2);
+                RefreshLiveState();
+            });
+        }
+        catch (Exception ex)
+        {
+            var e = ex.Message;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                LiveStatus = "Live error: " + e;
+                IsLiveBusy = false;
+            });
+        }
+    }
+
+    private void StopLive()
+    {
+        LiveServices.Tunnel.Stop();
+        AddLog("Live access stopped");
+        RefreshLiveState();
     }
 }
 

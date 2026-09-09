@@ -36,7 +36,7 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
 
         <!-- Configuration -->
         <Panel Grid.Row="0" Margin="0,0,0,12">
@@ -72,13 +72,15 @@
                                  Foreground="{DynamicResource TextBrush}" Padding="16,11" FontFamily="Consolas" FontSize="11"/>
                     </StackPanel>
 
-                    <Grid ColumnDefinitions="*,Auto,Auto">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                         <TextBlock Text="{Binding StatusText}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1"/>
                         <Button Grid.Column="1" Classes="pill pillGlass" Content="Save"
                                 Command="{Binding SaveConfigCommand}" Margin="0,0,8,0"/>
                         <Button Grid.Column="2" Classes="pill pillPrimary" Content="Connect"
-                                Command="{Binding ConnectCommand}"/>
+                                Command="{Binding ConnectCommand}" Margin="0,0,8,0"/>
+                        <Button Grid.Column="3" Classes="pill pillGhost" Content="Disconnect"
+                                Command="{Binding DisconnectCommand}"/>
                     </Grid>
 
                     <StackPanel Spacing="6">
@@ -91,7 +93,7 @@
                             <Button Grid.Column="2" Classes="pill pillGlass" Content="Add user" Command="{Binding AddUserCommand}"/>
                         </Grid>
                     </StackPanel>
-                    <TextBlock Text="/ip /ping /uptime /battery /free /users — 35 команд, опасные только для админов"
+                    <TextBlock Text="/ip /ping /uptime /battery /free /users /live — args inline, dangerous ones admins only"
                                FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
                 </StackPanel>
             </Border>
@@ -105,8 +107,51 @@
             </Border>
         </Panel>
 
+        <!-- Live access for WebApp -->
+        <Border Grid.Row="1" Margin="0,0,0,12">
+            <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1"
+                    BoxShadow="0 10 30 -8 #59000000" Padding="22">
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Live WebApp Access" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                        <Border Grid.Column="1" CornerRadius="12" Padding="12,7"
+                                Background="#14FFFFFF" BorderBrush="#1FFFFFFF" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Width="8" Height="8" CornerRadius="4" VerticalAlignment="Center"
+                                        Background="{Binding IsLiveRunning, Converter={StaticResource BoolToAccentBrushConverter}}"/>
+                                <TextBlock Text="{Binding IsLiveRunning}" FontSize="10" FontWeight="Bold"
+                                           Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <TextBlock Text="{Binding LiveStatus}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                               TextWrapping="Wrap"/>
+                    <Grid ColumnDefinitions="*,*" IsVisible="{Binding IsLiveRunning}">
+                        <TextBox Text="{Binding LiveUrl, Mode=OneWay}" IsReadOnly="True"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                 Foreground="{DynamicResource TextBrush}" Padding="16,11" FontFamily="Consolas" FontSize="11" Margin="0,0,8,0"
+                                 Watermark="Live URL"/>
+                        <TextBox Grid.Column="1" Text="{Binding LiveToken, Mode=OneWay}" IsReadOnly="True"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                 Foreground="{DynamicResource TextBrush}" Padding="16,11" FontFamily="Consolas" FontSize="11"
+                                 Watermark="Token"/>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,*">
+                        <Button Grid.Column="0" Classes="pill pillPrimary" Content="Publish live link"
+                                Command="{Binding PublishLiveCommand}" Margin="0,0,8,0"/>
+                        <Button Grid.Column="1" Classes="pill pillGhost" Content="Stop live"
+                                Command="{Binding StopLiveCommand}"/>
+                    </Grid>
+                    <TextBlock Text="Publishes an HTTPS link (Cloudflare Tunnel) to the local remote API. Enter the URL + token in the WebApp Live tab: live stats, screen, camera and instant controls inside the app."
+                               FontSize="9" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+        </Border>
+
         <!-- Controls + Log -->
-        <Grid Grid.Row="1" RowDefinitions="Auto,*">
+        <Grid Grid.Row="2" RowDefinitions="Auto,*">
 
             <Border Grid.Row="0" CornerRadius="22" Background="{DynamicResource CardBrush}"
                     BorderBrush="#1FFFFFFF" BorderThickness="1"
