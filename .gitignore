@@ -28,3 +28,7 @@ Desktop.ini
 *.log
 telegram.json
 settings.json
+
+# MiniApp lives in its own repo (systemguard-miniapp, GitHub Pages)
+SystemGuard.MiniApp/
+
