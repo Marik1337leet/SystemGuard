@@ -1,10 +1,16 @@
 using System;
+using Avalonia.Threading;
 using SystemGuard.Desktop.Views;
 
 namespace SystemGuard.Desktop.Services;
 
 // Единая точка управления оверлеями (Dock + виджеты): показать/скрыть,
 // восстановить при старте, корректно закрыть при выходе.
+//
+// ВАЖНО: окна Avalonia можно создавать/показывать ТОЛЬКО на UI-потоке.
+// Вызовы прилетают и с фона (глобальный хоткей, RemoteActions, бот) —
+// раньше это молча падало в пустом catch и «виджет не запускался».
+// Теперь всё маршалится на Dispatcher.UIThread.
 public static class OverlayManager
 {
     private static DockWindow? _dock;
@@ -13,50 +19,78 @@ public static class OverlayManager
     public static bool IsDockOpen => _dock != null;
     public static bool IsWidgetsOpen => _widgets != null;
 
-    public static void ShowDock()
+    private static void OnUi(Action action)
     {
         try
         {
-            if (_dock != null) { _dock.Activate(); return; }
-            _dock = new DockWindow();
-            _dock.Closed += (_, __) => _dock = null;
-            _dock.Show();
+            if (Dispatcher.UIThread.CheckAccess()) action();
+            else Dispatcher.UIThread.Post(action);
         }
         catch { }
+    }
+
+    public static void ShowDock()
+    {
+        OnUi(() =>
+        {
+            try
+            {
+                if (_dock != null) { _dock.Activate(); return; }
+                _dock = new DockWindow();
+                _dock.Closed += (_, __) => _dock = null;
+                _dock.Show();
+            }
+            catch { }
+        });
     }
 
     public static void HideDock()
     {
-        try { _dock?.Close(); } catch { }
-        _dock = null;
+        OnUi(() =>
+        {
+            try { _dock?.Close(); } catch { }
+            _dock = null;
+        });
     }
 
     public static void RefreshDock()
     {
-        try { _dock?.Rebuild(); } catch { }
+        OnUi(() =>
+        {
+            try { _dock?.Rebuild(); } catch { }
+        });
     }
 
     public static void ShowWidgets()
     {
-        try
+        OnUi(() =>
         {
-            if (_widgets != null) { _widgets.Activate(); return; }
-            _widgets = new WidgetsWindow();
-            _widgets.Closed += (_, __) => _widgets = null;
-            _widgets.Show();
-        }
-        catch { }
+            try
+            {
+                if (_widgets != null) { _widgets.Activate(); return; }
+                _widgets = new WidgetsWindow();
+                _widgets.Closed += (_, __) => _widgets = null;
+                _widgets.Show();
+            }
+            catch { }
+        });
     }
 
     public static void HideWidgets()
     {
-        try { _widgets?.Close(); } catch { }
-        _widgets = null;
+        OnUi(() =>
+        {
+            try { _widgets?.Close(); } catch { }
+            _widgets = null;
+        });
     }
 
     public static void RefreshWidgets()
     {
-        try { _widgets?.Rebuild(); } catch { }
+        OnUi(() =>
+        {
+            try { _widgets?.Rebuild(); } catch { }
+        });
     }
 
     public static void RestoreAtStartup()

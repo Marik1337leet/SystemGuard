@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:controls="using:SystemGuard.Desktop.Controls"
              xmlns:services="using:SystemGuard.Desktop.Services"
              x:Class="SystemGuard.Desktop.Views.DeepUninstallView"
              x:DataType="vm:DeepUninstallViewModel">
@@ -92,7 +93,19 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid ColumnDefinitions="380,*" Margin="28,22,28,22">
+    <!-- Pro-гейт: баннер только на Free, контент ниже блокируется -->
+    <Grid RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Margin="28,0,28,12" Padding="14,12" CornerRadius="18"
+                Background="#33C96C9E" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                IsVisible="{Binding !IsProLicense}">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <controls:LockBadge VerticalAlignment="Center" />
+                <TextBlock Text="PRO-раздел: глубокое удаление доступно с Pro-лицензией. Купить — кнопка слева снизу (Settings → License)."
+                           FontSize="11" Foreground="{DynamicResource TextBrush}"
+                           VerticalAlignment="Center" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+        <Grid Grid.Row="1" ColumnDefinitions="380,*" Margin="28,0,28,22" IsEnabled="{Binding IsProLicense}">
 
         <!-- ═══ LEFT — Program List ══════════════════════════════════════════ -->
         <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*" Margin="0,0,10,0">
@@ -132,14 +145,9 @@
                     BorderBrush="#1FFFFFFF" BorderThickness="1"
                     CornerRadius="18" Padding="14,10" Margin="0,0,0,10">
                 <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Text="{Binding StatusText}" FontSize="10"
-                               Foreground="{DynamicResource TextMutedBrush}"
-                               VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding FilteredPrograms.Count, StringFormat='{}{0} programs'}"
+                    <TextBlock Text="{Binding FilteredPrograms.Count, StringFormat='{}{0} programs'}"
                                FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
-                               VerticalAlignment="Center" Margin="12,0,0,0"/>
+                               VerticalAlignment="Center" Margin="12,0,0,0" HorizontalAlignment="Right"/>
                 </Grid>
             </Border>
 
@@ -333,14 +341,9 @@
                     CornerRadius="18" Padding="16,12" Margin="0,0,0,10"
                     IsVisible="{Binding IsScanning}">
                 <StackPanel Spacing="10">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Text="{Binding StatusText}" FontSize="11"
-                                   Foreground="{DynamicResource TextBrush}"
-                                   TextTrimming="CharacterEllipsis" MaxLines="1"/>
-                        <Button Grid.Column="1" Classes="pill pillGhost" Content="Cancel"
-                                Padding="14,6" FontSize="10"
-                                Command="{Binding CancelCommand}" Margin="12,0,0,0"/>
-                    </Grid>
+                    <Button Classes="pill pillGhost" Content="Cancel"
+                            Padding="14,6" FontSize="10" HorizontalAlignment="Right"
+                            Command="{Binding CancelCommand}" Margin="12,0,0,0"/>
                     <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100"
                                  Height="4" CornerRadius="2"
                                  Foreground="{DynamicResource AccentBrush}"
@@ -431,22 +434,19 @@
                     BorderBrush="#1FFFFFFF" BorderThickness="1"
                     CornerRadius="18" Padding="16,10" Margin="0,10,0,0"
                     IsVisible="{Binding HasTraces}">
-                <Grid ColumnDefinitions="*,Auto,Auto">
-                    <TextBlock Text="{Binding StatusText}" FontSize="10"
-                               Foreground="{DynamicResource TextMutedBrush}"
-                               VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
-                    <TextBlock Grid.Column="1"
+                <Grid ColumnDefinitions="Auto,Auto">
+                    <TextBlock Grid.Column="0"
                                Text="{Binding TotalSelectedCount, StringFormat='{}{0} selected'}"
                                FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
                                Margin="12,0,12,0" VerticalAlignment="Center" MaxLines="1"/>
-                    <TextBlock Grid.Column="2"
+                    <TextBlock Grid.Column="1"
                                Text="{Binding TotalSelectedSize, Converter={StaticResource BytesToMBConverter}}"
                                FontSize="10" Foreground="{DynamicResource AccentLightBrush}"
-                               VerticalAlignment="Center" MaxLines="1"/>
+                                VerticalAlignment="Center" MaxLines="1"/>
                 </Grid>
             </Border>
 
         </Grid>
+    </Grid>
     </Grid>
 </UserControl>

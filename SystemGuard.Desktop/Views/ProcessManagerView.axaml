@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:controls="using:SystemGuard.Desktop.Controls"
              xmlns:models="using:SystemGuard.Desktop.Models"
              x:Class="SystemGuard.Desktop.Views.ProcessManagerView"
              x:DataType="vm:ProcessManagerViewModel">
@@ -35,7 +36,10 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <!-- Шапка фиксирована, скроллится только список процессов (Grid.Row=1).
+         ListBox скроллится сам — оборачивать его в ScrollViewer нельзя
+         (ломает виртуализацию и даёт двойной скролл). -->
+    <Grid RowDefinitions="Auto,*">
 
         <Panel Grid.Row="0" Margin="0,0,0,12">
             <Border CornerRadius="22" Background="{DynamicResource CardBrush}"
@@ -44,13 +48,13 @@
                 <StackPanel Spacing="12">
                     <TextBox Text="{Binding SearchText}" Watermark="Search by name, PID, path, company…"
                              Background="#14FFFFFF" BorderThickness="0" CornerRadius="16"
-                             Foreground="{DynamicResource TextBrush}" Padding="16,10"/>
+                             Foreground="{DynamicResource TextBrush}" Padding="16,10" FontSize="13"/>
                     <Grid ColumnDefinitions="*,*,Auto">
                         <ComboBox ItemsSource="{Binding ProcessFilters}" SelectedItem="{Binding ProcessFilter}"
                                   Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
                                   Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0"/>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0,0,8,0">
-                            <CheckBox IsChecked="{Binding AutoRefreshEnabled}" Content="Auto" Foreground="{DynamicResource TextBrush}" FontSize="11" VerticalAlignment="Center"/>
+                            <CheckBox IsChecked="{Binding AutoRefreshEnabled}" Content="Auto" Foreground="{DynamicResource TextBrush}" FontSize="11" VerticalAlignment="Center" CornerRadius="12"/>
                             <Slider Value="{Binding AutoRefreshSeconds}" Minimum="2" Maximum="5" TickFrequency="1" IsSnapToTickEnabled="True" Width="80" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding AutoRefreshSeconds, StringFormat='{}{0}s'}" FontSize="10" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                         </StackPanel>
@@ -58,16 +62,28 @@
                     </Grid>
                     <WrapPanel>
                         <Button Classes="pill pillGlass" Content="Kill" Command="{Binding KillCommand}" Margin="0,0,8,8"/>
-                        <Button Classes="pill pillGlass" Content="Force kill" Command="{Binding KillForceCommand}" Margin="0,0,8,8"/>
-                        <Button Classes="pill pillGlass" Content="Kill tree" Command="{Binding KillTreeCommand}" Margin="0,0,8,8"/>
-                        <Button Classes="pill pillGhost" Content="Suspend" Command="{Binding SuspendCommand}" Margin="0,0,8,8"/>
-                        <Button Classes="pill pillGhost" Content="Resume" Command="{Binding ResumeCommand}" Margin="0,0,8,8"/>
-                        <Button Classes="pill pillGhost" Content="Dump" Command="{Binding DumpCommand}" Margin="0,0,8,8"/>
-                        <Button Classes="pill pillGhost" Content="VirusTotal" Command="{Binding CheckVirusTotalCommand}" Margin="0,0,8,8"/>
                         <Button Classes="pill pillGhost" Content="Open folder" Command="{Binding OpenLocationCommand}" Margin="0,0,8,8"/>
                     </WrapPanel>
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="PRIORITY" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                    <!-- Pro-гейт: расширенное управление процессами -->
+                    <StackPanel Spacing="6" IsEnabled="{Binding IsProLicense}">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="ADVANCED" FontSize="9" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                            <controls:LockBadge VerticalAlignment="Center" IsVisible="{Binding !IsProLicense}" />
+                        </StackPanel>
+                        <WrapPanel>
+                            <Button Classes="pill pillGlass" Content="Force kill" Command="{Binding KillForceCommand}" Margin="0,0,8,8"/>
+                            <Button Classes="pill pillGlass" Content="Kill tree" Command="{Binding KillTreeCommand}" Margin="0,0,8,8"/>
+                            <Button Classes="pill pillGhost" Content="Suspend" Command="{Binding SuspendCommand}" Margin="0,0,8,8"/>
+                            <Button Classes="pill pillGhost" Content="Resume" Command="{Binding ResumeCommand}" Margin="0,0,8,8"/>
+                            <Button Classes="pill pillGhost" Content="Dump" Command="{Binding DumpCommand}" Margin="0,0,8,8"/>
+                            <Button Classes="pill pillGhost" Content="VirusTotal" Command="{Binding CheckVirusTotalCommand}" Margin="0,0,8,8"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <StackPanel Spacing="6" IsEnabled="{Binding IsProLicense}">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="PRIORITY" FontSize="9" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+                            <controls:LockBadge VerticalAlignment="Center" IsVisible="{Binding !IsProLicense}" />
+                        </StackPanel>
                         <ItemsControl ItemsSource="{Binding PriorityLevels}">
                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
@@ -79,18 +95,21 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
+                    <!-- Pro-гейт: affinity + inject -->
+                    <StackPanel Spacing="6" IsEnabled="{Binding IsProLicense}">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBox Text="{Binding AffinityMask}" Watermark="Affinity mask, e.g. 0x3"
                                  Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
-                                 Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontFamily="Consolas" FontSize="11"/>
+                                 Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontFamily="Consolas" FontSize="13"/>
                         <Button Grid.Column="1" Classes="pill pillGlass" Content="Set affinity" Command="{Binding ApplyAffinityCommand}"/>
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBox Text="{Binding DllPath}" Watermark="DLL path for inject (developers)…"
                                  Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
-                                 Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontFamily="Consolas" FontSize="11"/>
+                                 Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontFamily="Consolas" FontSize="13"/>
                         <Button Grid.Column="1" Classes="pill pillGhost" Content="Inject DLL" Command="{Binding InjectDllCommand}"/>
                     </Grid>
+                    </StackPanel>
                 </StackPanel>
             </Border>
             <Border CornerRadius="22" IsHitTestVisible="False">
@@ -106,9 +125,10 @@
         <Border Grid.Row="1" CornerRadius="24" Background="{DynamicResource CardBrush}"
                 BorderBrush="#1FFFFFFF" BorderThickness="1"
                 BoxShadow="0 8 24 -8 #4D000000" Padding="8">
-            <ScrollViewer>
-                <ListBox ItemsSource="{Binding Processes}" SelectedItem="{Binding SelectedProcess}"
-                         Background="Transparent" BorderThickness="0" Padding="4">
+            <ListBox ItemsSource="{Binding Processes}" SelectedItem="{Binding SelectedProcess}"
+                     Background="Transparent" BorderThickness="0" Padding="4"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto">
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="models:ProcessModel">
                             <Border Padding="14,10" Classes="rowGlass" CornerRadius="10"
@@ -140,17 +160,6 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
-            </ScrollViewer>
-        </Border>
-
-        <Border Grid.Row="2" Background="{DynamicResource CardBrush}"
-                BorderBrush="#1FFFFFFF" BorderThickness="1"
-                CornerRadius="16" Padding="16,10" Margin="0,12,0,0">
-            <StackPanel Orientation="Horizontal" Spacing="10">
-                <Border Width="7" Height="7" CornerRadius="4" Background="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"
-                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1"/>
-            </StackPanel>
         </Border>
 
     </Grid>

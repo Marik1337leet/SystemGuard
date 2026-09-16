@@ -41,7 +41,7 @@ public static class BrightnessService
                 {
                     RedirectStandardOutput = true, RedirectStandardError = true,
                     UseShellExecute = false, CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
+                    StandardOutputEncoding = CmdEncoding.Oem, StandardErrorEncoding = CmdEncoding.Oem
                 }
             };
             p.Start();

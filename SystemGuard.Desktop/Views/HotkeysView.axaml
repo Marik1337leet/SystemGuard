@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             x:Class="SystemGuard.Desktop.Views.HotkeysView"
+             x:DataType="vm:HotkeysViewModel">
+    <StackPanel Spacing="14" Margin="0,0,0,8">
+        <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
+                BorderThickness="1" CornerRadius="22" Padding="22"
+                BoxShadow="0 8 24 -8 #4D000000">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Глобальные хоткеи" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                <TextBlock Text="Стандартных биндов нет — создайте свои: кликните в поле и нажмите клавиши, комбо впишется само. Хук глобальный — работает из игры и когда окно свёрнуто."
+                           FontSize="11" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding Status}" FontSize="11" FontWeight="SemiBold"
+                           Foreground="{DynamicResource AccentLightBrush}" TextWrapping="Wrap" MaxLines="2"/>
+                <!-- Добавить свой хоткей -->
+                <Grid ColumnDefinitions="*,170,Auto" Margin="0,4,0,0">
+                    <ComboBox ItemsSource="{Binding AvailableActionTitles}" SelectedItem="{Binding NewActionId}"
+                              Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
+                              Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0"
+                              PlaceholderText="Действие…"/>
+                    <TextBox Grid.Column="1" Text="{Binding NewCombo}" Watermark="Нажмите клавиши…"
+                             Tag="capture"
+                             Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
+                             Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0"
+                             FontFamily="Consolas" FontSize="13" VerticalAlignment="Center"
+                             ToolTip.Tip="Кликните и нажмите нужные клавиши — комбо впишется само. Backspace — очистить."/>
+                    <Button Grid.Column="2" Classes="pill pillPrimary" Content="Add"
+                            Command="{Binding AddHotkeyCommand}" Padding="16,8" VerticalAlignment="Center"/>
+                </Grid>
+                <TextBlock Text="Пока пусто — добавьте первый хоткей выше."
+                           FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                           IsVisible="{Binding !HasItems}"/>
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:HotkeyItem">
+                            <Border BorderBrush="#14FFFFFF" BorderThickness="0,0,0,1" Padding="0,10">
+                                <Grid ColumnDefinitions="*,170,Auto,Auto,Auto" VerticalAlignment="Center">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                                        <TextBlock Text="{Binding Hint}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
+                                    </StackPanel>
+                                    <TextBox Grid.Column="1" Text="{Binding Combo}" Watermark="Нажмите клавиши…"
+                                             Tag="capture"
+                                             Background="#14FFFFFF" BorderThickness="0" CornerRadius="12"
+                                             Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="8,0"
+                                             FontFamily="Consolas" FontSize="13" VerticalAlignment="Center"
+                                             ToolTip.Tip="Кликните и нажмите нужные клавиши — комбо впишется само. Backspace — очистить."/>
+                                    <ToggleSwitch Grid.Column="2" IsChecked="{Binding Enabled}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <Button Grid.Column="3" Classes="pill pillGhost" Padding="0" Width="34" Height="34"
+                                            CornerRadius="17" Margin="0,0,6,0" ToolTip.Tip="Выполнить сейчас"
+                                            Command="{Binding $parent[UserControl].((vm:HotkeysViewModel)DataContext).RunActionCommand}"
+                                            CommandParameter="{Binding ActionId}">
+                                        <Path Data="M9 6.5v11c0 .8.9 1.3 1.6.9l8.5-5.5c.6-.4.6-1.4 0-1.8L10.6 5.6c-.7-.4-1.6.1-1.6.9z"
+                                              Fill="{DynamicResource AccentBrush}" Width="13" Height="13" Stretch="Uniform"/>
+                                    </Button>
+                                    <Button Grid.Column="4" Classes="pill pillGhost" Padding="0" Width="34" Height="34"
+                                            CornerRadius="17" ToolTip.Tip="Удалить"
+                                            Command="{Binding $parent[UserControl].((vm:HotkeysViewModel)DataContext).RemoveHotkeyCommand}"
+                                            CommandParameter="{Binding ActionId}">
+                                        <Path Data="M6 6l12 12M18 6L6 18" Stroke="{DynamicResource TextMutedBrush}"
+                                              StrokeThickness="2" Width="11" Height="11" Stretch="Uniform"/>
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <WrapPanel>
+                    <Button Classes="pill pillPrimary" Content="Сохранить" Command="{Binding SaveCommand}" Margin="0,0,8,8"/>
+                    <Button Classes="pill pillGhost" Content="Очистить всё" Command="{Binding ResetCommand}" Margin="0,0,8,8"/>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

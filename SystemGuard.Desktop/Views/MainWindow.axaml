@@ -4,6 +4,7 @@
         x:Class="SystemGuard.Desktop.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="System Guard"
+        Icon="avares://SystemGuard/Assets/logo.ico"
         Width="1440" Height="900"
         MinWidth="1000" MinHeight="600"
         WindowStartupLocation="CenterScreen"
@@ -55,16 +56,8 @@
                     <StackPanel Grid.Row="0" Margin="18,22,18,14" Spacing="0">
                         <StackPanel Orientation="Horizontal" Spacing="12">
                             <Border Width="38" Height="38" CornerRadius="12">
-                                <Border.Background>
-                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                        <GradientStop Color="{DynamicResource AccentColor}" Offset="0"/>
-                                        <GradientStop Color="{DynamicResource AccentLightColor}" Offset="1"/>
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                                <TextBlock Text="SG" FontSize="14" FontWeight="Black"
-                                           Foreground="{DynamicResource BgBrush}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
+                                <Image Source="avares://SystemGuard/Assets/logo.png"
+                                       Width="38" Height="38" Stretch="UniformToFill"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="SYSTEM" FontSize="9" FontWeight="Bold"
@@ -115,15 +108,23 @@
                         </ItemsControl>
                     </ScrollViewer>
 
-                    <!-- License badge -->
-                    <Border Grid.Row="2"
+                    <!-- License badge: кнопка покупки (Free → Upgrade, Pro → управление) -->
+                    <Button Grid.Row="2"
                             Margin="12,8,12,12"
-                            Padding="14,12"
-                            CornerRadius="18"
-                            Background="#14FFFFFF"
-                            BorderBrush="#1FFFFFFF"
-                            BorderThickness="1">
-                        <Grid ColumnDefinitions="Auto,*">
+                            Padding="0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            ToolTip.Tip="Open license — buy Pro / extend / enter gift key"
+                            Command="{Binding NavigateToLicenseCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Stretch">
+                        <Border Padding="14,12"
+                                CornerRadius="18"
+                                Background="#14FFFFFF"
+                                BorderBrush="#1FFFFFFF"
+                                BorderThickness="1">
+                            <Grid ColumnDefinitions="Auto,*">
                             <Border Width="34" Height="34" CornerRadius="17"
                                     Background="{DynamicResource AccentBrush}">
                                 <TextBlock Text="{Binding LicenseBadgeChar}"
@@ -145,7 +146,8 @@
                                            TextTrimming="CharacterEllipsis" MaxLines="1"/>
                             </StackPanel>
                         </Grid>
-                    </Border>
+                        </Border>
+                    </Button>
 
                 </Grid>
             </Border>
@@ -209,14 +211,16 @@
                         BorderBrush="#1FFFFFFF" BorderThickness="1"
                         BoxShadow="0 10 30 -8 #59000000"
                         Padding="20">
-                    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Auto">
-                        <ContentControl Content="{Binding CurrentView}"
-                                        HorizontalAlignment="Stretch"
-                                        VerticalAlignment="Stretch"
-                                        HorizontalContentAlignment="Stretch"
-                                        VerticalContentAlignment="Stretch"/>
-                    </ScrollViewer>
+                    <!-- Контент без внешнего ScrollViewer: каждая вкладка сама
+                         управляет скроллом (у кого страница — свой ScrollViewer,
+                         у кого боксы — скроллятся только боксы, шапка фиксирована).
+                         Внешний скролл давал бесконечную высоту и ломал Grid-строки *,
+                         из-за чего листалась вся страница вместо списков. -->
+                    <ContentControl Content="{Binding CurrentView}"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Stretch"
+                                    HorizontalContentAlignment="Stretch"
+                                    VerticalContentAlignment="Stretch"/>
                 </Border>
                 <Border CornerRadius="24" IsHitTestVisible="False">
                     <Border.Background>

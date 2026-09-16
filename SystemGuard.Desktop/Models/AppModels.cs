@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace SystemGuard.Desktop.Models;
 
@@ -50,6 +51,19 @@ public class AppSettings
     public bool ShowNotifications { get; set; } = true;
     public string TelegramToken { get; set; } = "";
     public string TelegramChatId { get; set; } = "";
-    public string Version { get; set; } = "1.0.0";
+    public string Version { get; set; } = "2.0.0";
     public string LastCheckUpdate { get; set; } = "Never";
+    // Глобальные хоткеи пользователя (пусто = нет биндов, стандартных нет)
+    public List<HotkeyBinding> Hotkeys { get; set; } = new();
+    // Вентиляторы: Auto | Silent | Balanced | Performance | Manual
+    public string FanMode { get; set; } = "Auto";
+    public int FanManualPercent { get; set; } = 50;
+}
+
+/// <summary>Бинд хоткея на действие. Combo вида "Ctrl+Alt+O".</summary>
+public class HotkeyBinding
+{
+    public string ActionId { get; set; } = "";
+    public string Combo { get; set; } = "";
+    public bool Enabled { get; set; } = true;
 }

@@ -228,6 +228,9 @@ public record GameProfileSnapshot(
     bool AutoRestoreOnGameExit,
     bool DisableGameBar,
     bool DisableGameDvr,
+    bool CloseBrowsersOnStart,
+    bool StopXboxServices,
+    bool DisableTransparency,
     IReadOnlyList<string> ProcessesToKeep,
     IReadOnlyList<string> ProcessesToKill
 );

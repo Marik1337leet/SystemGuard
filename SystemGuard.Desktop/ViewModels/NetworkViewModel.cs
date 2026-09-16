@@ -25,11 +25,11 @@ public partial class NetworkViewModel : ViewModelBase
     [ObservableProperty] private string _latencyText = "Ping: —";
     [ObservableProperty] private string _selectedTab = "Adapters";
     [ObservableProperty] private bool _isAdaptersTab = true;
-    [ObservableProperty] private bool _isTrafficTab;
     [ObservableProperty] private bool _isFirewallTab;
     [ObservableProperty] private bool _isToolsTab;
     [ObservableProperty] private string _speedTestResult = "";
     [ObservableProperty] private bool _isTestingSpeed;
+    [ObservableProperty] private double _speedTestProgress;
 
     // Tools: DNS / hosts / ports — всё реальное
     [ObservableProperty] private string _selectedDnsOption = "Automatic (DHCP)";
@@ -129,7 +129,6 @@ public partial class NetworkViewModel : ViewModelBase
         if (string.IsNullOrEmpty(tab)) return;
         SelectedTab = tab;
         IsAdaptersTab = tab == "Adapters";
-        IsTrafficTab = tab == "Traffic";
         IsFirewallTab = tab == "Firewall";
         IsToolsTab = tab == "Tools";
 
@@ -197,7 +196,7 @@ public partial class NetworkViewModel : ViewModelBase
         Latency = await _networkService.TestLatency();
         LatencyText = Latency > 0
             ? $"Ping: {Latency} ms"
-            : "Ping: failed";
+            : "Ping blocked (ICMP filtered?) — not an internet problem";
         StatusText = LatencyText;
     }
 
@@ -205,11 +204,28 @@ public partial class NetworkViewModel : ViewModelBase
     {
         if (IsTestingSpeed) return;
         IsTestingSpeed = true;
-        SpeedTestResult = "Testing download speed… (10 MB)";
-        var (ok, mbps, detail) = await _networkService.TestDownloadSpeedAsync();
-        SpeedTestResult = ok ? $"Download: {mbps} Mbps ({detail})" : $"Speed test failed: {detail}";
-        StatusText = SpeedTestResult;
-        IsTestingSpeed = false;
+        SpeedTestProgress = 0;
+        SpeedTestResult = "Connecting…";
+        try
+        {
+            var progress = new Progress<(double Percent, double Mbps)>(p =>
+            {
+                SpeedTestProgress = p.Percent;
+                if (p.Mbps > 0)
+                    SpeedTestResult = $"Testing… {p.Mbps:F1} Mbps ({p.Percent:F0}%)";
+            });
+            var (ok, mbps, detail) = await SpeedTestService.RunDownloadTestAsync(progress);
+            SpeedTestProgress = ok ? 100 : 0;
+            SpeedTestResult = ok ? $"Download: {mbps:F1} Mbps ({detail})" : $"Speed test failed: {detail}";
+            StatusText = SpeedTestResult;
+        }
+        catch (Exception ex)
+        {
+            SpeedTestProgress = 0;
+            SpeedTestResult = $"Speed test failed: {ex.Message}";
+            StatusText = SpeedTestResult;
+        }
+        finally { IsTestingSpeed = false; }
     }
 
     private void ApplyDns()

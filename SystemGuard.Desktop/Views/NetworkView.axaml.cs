@@ -7,7 +7,8 @@ namespace SystemGuard.Desktop.Views;
 
 public partial class NetworkView : UserControl
 {
-    // Капля 132px: Adapters / Traffic / Firewall / Tools → 0 / 132 / 264 / 396.
+    // Капля 132px: Adapters / Firewall / Tools → 0 / 132 / 264.
+    // Traffic удалён (дубль мониторинга).
     public NetworkView() => InitializeComponent();
 
     private void MoveDroplet(int index)
@@ -25,7 +26,6 @@ public partial class NetworkView : UserControl
     }
 
     private void AdaptersTab_Click(object? sender, RoutedEventArgs e) => SelectTab("Adapters", 0);
-    private void TrafficTab_Click(object? sender, RoutedEventArgs e) => SelectTab("Traffic", 1);
-    private void FirewallTab_Click(object? sender, RoutedEventArgs e) => SelectTab("Firewall", 2);
-    private void ToolsTab_Click(object? sender, RoutedEventArgs e) => SelectTab("Tools", 3);
+    private void FirewallTab_Click(object? sender, RoutedEventArgs e) => SelectTab("Firewall", 1);
+    private void ToolsTab_Click(object? sender, RoutedEventArgs e) => SelectTab("Tools", 2);
 }

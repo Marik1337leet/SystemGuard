@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/connBadge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Офлайн"
+        android:textStyle="bold"
+        android:padding="8dp" />
+
+    <!-- Connect -->
+    <LinearLayout
+        android:id="@+id/secConnect"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+        <EditText
+            android:id="@+id/inUrl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="https://… (ссылка из Publish live link)"
+            android:inputType="textUri" />
+        <EditText
+            android:id="@+id/inToken"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="токен" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/btnLink"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Связать" />
+            <Button
+                android:id="@+id/btnUnlink"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Отключить" />
+        </LinearLayout>
+        <TextView
+            android:id="@+id/txtState"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Не связано" />
+    </LinearLayout>
+
+    <!-- Bot Relay: вне дома без туннеля (через Telegram) -->
+    <LinearLayout
+        android:id="@+id/secRelay"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="8dp">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Relay через Telegram (вне дома, без туннеля)"
+            android:textStyle="bold" />
+        <EditText
+            android:id="@+id/inBotToken"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="токен того же бота, что на ПК"
+            android:inputType="textPassword" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <EditText
+                android:id="@+id/inBotChat"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Chat ID (цифры)"
+                android:inputType="number" />
+            <Button
+                android:id="@+id/btnRelayLink"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Relay" />
+        </LinearLayout>
+        <TextView
+            android:id="@+id/txtRelayState"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Relay: не связан" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/secStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/txtStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="—" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <Button android:id="@+id/btnPerf" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Perf" />
+                    <Button android:id="@+id/btnSysinfo" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Система" />
+                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <Button android:id="@+id/btnShutdown" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Выкл" />
+                    <Button android:id="@+id/btnRestart" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Рестарт" />
+                    <Button android:id="@+id/btnSleep" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Сон" />
+                    <Button android:id="@+id/btnLock" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Блок" />
+                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <EditText android:id="@+id/inWol" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="AA:BB:CC:DD:EE:FF" />
+                    <Button android:id="@+id/btnWol" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="WoL" />
+                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <EditText android:id="@+id/inPass" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="пароль Windows" android:inputType="textPassword" />
+                    <Button android:id="@+id/btnUnlock" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ввести" />
+                </LinearLayout>
+                <TextView android:id="@+id/txtPower" android:layout_width="match_parent" android:layout_height="wrap_content" android:fontFamily="monospace" />
+            </LinearLayout>
+
+            <com.systemguard.remote.MjpegView
+                android:id="@+id/screenView"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:background="#0B1220"
+                android:scaleType="fitCenter" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <Button android:id="@+id/btnShot" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Кадр" />
+                <Button android:id="@+id/btnVideo" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Видео" />
+                <Button android:id="@+id/btnVideoStop" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Стоп" />
+            </LinearLayout>
+            <com.systemguard.remote.MjpegView
+                android:id="@+id/camView"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:background="#0B1220"
+                android:scaleType="fitCenter" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <Button android:id="@+id/btnCam" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Фото" />
+                <Button android:id="@+id/btnCamVideo" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Видео" />
+                <Button android:id="@+id/btnCamStop" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Стоп" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <Button android:id="@+id/btnVolDown" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="−10" />
+                <Button android:id="@+id/btnMute" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Мут" />
+                <Button android:id="@+id/btnVolUp" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="+10" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <Button android:id="@+id/btnPrev" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="◀" />
+                <Button android:id="@+id/btnPlay" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="▶❚❚" />
+                <Button android:id="@+id/btnNext" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="▶" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <Button android:id="@+id/btnProcs" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Процессы" />
+                <Button android:id="@+id/btnNet" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Сеть" />
+                <Button android:id="@+id/btnStartup" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Автозагрузка" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <EditText android:id="@+id/inKill" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="завершить процесс…" />
+                <Button android:id="@+id/btnKill" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✕" />
+            </LinearLayout>
+            <TextView android:id="@+id/txtPc" android:layout_width="match_parent" android:layout_height="wrap_content" android:fontFamily="monospace" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <EditText android:id="@+id/inLs" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="C:\" />
+                <Button android:id="@+id/btnLs" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Список" />
+            </LinearLayout>
+            <TextView android:id="@+id/txtFiles" android:layout_width="match_parent" android:layout_height="wrap_content" android:fontFamily="monospace" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <EditText android:id="@+id/inCmd" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="ipconfig, tasklist…" />
+                <Button android:id="@+id/btnCmd" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Run" />
+            </LinearLayout>
+            <TextView android:id="@+id/txtCmd" android:layout_width="match_parent" android:layout_height="wrap_content" android:fontFamily="monospace" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

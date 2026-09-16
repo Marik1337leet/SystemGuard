@@ -77,6 +77,9 @@ public partial class GameModeViewModel : ViewModelBase
 
     public TweaksViewModel Tweaks { get; }
 
+    // Глобальные хоткеи живут в Gaming (быстрые действия из игры).
+    public HotkeysViewModel Hotkeys { get; } = new();
+
     public Avalonia.Controls.Window? OwnerWindow { get; set; }
 
     public IRelayCommand EnableGameModeCommand { get; }
@@ -145,8 +148,16 @@ public partial class GameModeViewModel : ViewModelBase
         _liveMonitor.OnHardwareUpdated += info => Dispatcher.UIThread.Post(() =>
         {
             CpuNow = Math.Round(info.CpuLoad, 0);
-            var total = info.MemoryUsed + info.MemoryAvailable;
-            RamNow = total > 0 ? Math.Round(info.MemoryUsed / total * 100, 0) : 0;
+            // RAM — ТОЛЬКО из GlobalMemoryStatusEx (как в Dashboard):
+            // сумма сенсоров LHM на части машин даёт нули/чужие total,
+            // и полоска RAM в Live load вечно показывала 0%.
+            try
+            {
+                var (total, avail) = DetailedSystemInfoService.GetPhysicalMemory();
+                var used = Math.Max(0, total - avail);
+                RamNow = total > 0 ? Math.Round(used / total * 100, 0) : 0;
+            }
+            catch { RamNow = 0; }
         });
 
         LoadProfiles();
@@ -158,6 +169,7 @@ public partial class GameModeViewModel : ViewModelBase
         base.OnActivated();
         _liveMonitor.Start(1500);
         RestartAutoDetect();
+        Hotkeys.OnActivated();
     }
 
     public override void OnDeactivated()
@@ -461,10 +473,11 @@ public partial class GameModeViewModel : ViewModelBase
     private void AddProcessToKeep()
     {
         if (string.IsNullOrWhiteSpace(NewProcessToKeep) || SelectedProfile == null) return;
-        var name = NewProcessToKeep.Trim().Replace(".exe", "", StringComparison.OrdinalIgnoreCase);
+        var name = NormExeName(NewProcessToKeep);
+        if (string.IsNullOrEmpty(name)) return;
 
         List<string> current = new(SelectedProfile.ProcessesToKeep);
-        if (!current.Contains(name))
+        if (!current.Contains(name, StringComparer.OrdinalIgnoreCase))
         {
             current.Add(name);
             UpdateSelectedProfile(SelectedProfile with { ProcessesToKeep = current });
@@ -476,16 +489,26 @@ public partial class GameModeViewModel : ViewModelBase
     private void AddProcessToKill()
     {
         if (string.IsNullOrWhiteSpace(NewProcessToKill) || SelectedProfile == null) return;
-        var name = NewProcessToKill.Trim().Replace(".exe", "", StringComparison.OrdinalIgnoreCase);
+        var name = NormExeName(NewProcessToKill);
+        if (string.IsNullOrEmpty(name)) return;
 
         List<string> current = new(SelectedProfile.ProcessesToKill);
-        if (!current.Contains(name))
+        if (!current.Contains(name, StringComparer.OrdinalIgnoreCase))
         {
             current.Add(name);
             UpdateSelectedProfile(SelectedProfile with { ProcessesToKill = current });
             SaveProfiles();
         }
         NewProcessToKill = "";
+    }
+
+    private static string NormExeName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "";
+        var n = name.Trim().Trim('"');
+        if (n.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            n = n[..^4];
+        return n.Trim();
     }
 
     private void RemoveProcessToKeep(string? process)

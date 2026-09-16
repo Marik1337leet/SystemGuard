@@ -15,39 +15,23 @@ namespace SystemGuard.Desktop.ViewModels;
 
 public partial class PerformanceViewModel : ViewModelBase
 {
-    private readonly PowerService _powerService = new();
     private readonly BenchmarkService _benchmarkService = new();
     private readonly BenchmarkHistoryService _benchHistory = new();
     private readonly AuditLogService _audit = new();
 
-    [ObservableProperty] private ObservableCollection<PowerPlanInfo> _powerPlans = new();
-    [ObservableProperty] private PowerPlanInfo? _selectedPlan;
-    [ObservableProperty] private BatteryInfo? _batteryInfo;
     [ObservableProperty] private ObservableCollection<BenchmarkResult> _benchmarkResults = new();
     [ObservableProperty] private bool _isBenchmarking;
     [ObservableProperty] private string _statusText = "Ready";
     [ObservableProperty] private double _benchmarkProgress;
-    [ObservableProperty] private string _activePowerPlanName = "Balanced";
-    [ObservableProperty] private bool _hasBattery;
-    [ObservableProperty] private string _batteryEstimatedTime = "N/A";
-    [ObservableProperty] private string _batteryStatus = "Unknown";
-    [ObservableProperty] private string _batteryChargeColor = "#22C55E";
     [ObservableProperty] private string _overallRating = "";
     [ObservableProperty] private string _systemSummary = "";
 
-    // Текстовое поле для ввода минут перед Timer Shutdown
-    [ObservableProperty] private string _shutdownDelayMinutes = "60";
-
-    // История бенчмарков / стресс / стоимость энергии / системные инструменты
+    // История бенчмарков / стресс / системные инструменты
     [ObservableProperty] private ObservableCollection<BenchmarkRun> _benchmarkHistory = new();
     [ObservableProperty] private string _comparisonText = "";
     [ObservableProperty] private int _stressSeconds = 30;
     [ObservableProperty] private bool _isStressing;
     [ObservableProperty] private string _stressResult = "";
-    [ObservableProperty] private double _pcWatts = 150;
-    [ObservableProperty] private double _pcHoursPerDay = 6;
-    [ObservableProperty] private double _kwhTariff = 6;
-    [ObservableProperty] private string _powerCostText = "";
     [ObservableProperty] private string _registryPath = @"Software\SystemGuard";
     [ObservableProperty] private string _registryName = "Test";
     [ObservableProperty] private string _registryValue = "";
@@ -56,22 +40,16 @@ public partial class PerformanceViewModel : ViewModelBase
     [ObservableProperty] private ObservableCollection<DeviceEntry> _devices = new();
     [ObservableProperty] private string _tweakStatus = "";
 
+    // Вентиляторы живут в Performance (охлаждение рядом с температурами).
+    public FansViewModel Fans { get; } = new();
+
     [ObservableProperty] private ISeries[] _benchmarkChartSeries = Array.Empty<ISeries>();
     [ObservableProperty] private Axis[] _benchmarkXAxes = Array.Empty<Axis>();
     [ObservableProperty] private Axis[] _benchmarkYAxes = Array.Empty<Axis>();
 
-    public IRelayCommand ActivatePlanCommand { get; }
     public IRelayCommand RunBenchmarksCommand { get; }
-    public IRelayCommand ShutdownCommand { get; }
-    public IRelayCommand RestartCommand { get; }
-    public IRelayCommand SleepCommand { get; }
-    public IRelayCommand HibernateCommand { get; }
-    public IRelayCommand LockCommand { get; }
-    public IRelayCommand TimedShutdownCommand { get; }
-    public IRelayCommand FreeMemoryCommand { get; }
     public IRelayCommand RunStressCommand { get; }
     public IRelayCommand LoadBenchHistoryCommand { get; }
-    public IRelayCommand CalcPowerCostCommand { get; }
     public IRelayCommand RegistryReadCommand { get; }
     public IRelayCommand RegistryWriteCommand { get; }
     public IRelayCommand LoadEventsCommand { get; }
@@ -83,18 +61,9 @@ public partial class PerformanceViewModel : ViewModelBase
 
     public PerformanceViewModel()
     {
-        ActivatePlanCommand = new RelayCommand(ActivatePlan);
         RunBenchmarksCommand = new AsyncRelayCommand(RunBenchmarks);
-        ShutdownCommand = new RelayCommand(() => _powerService.Shutdown());
-        RestartCommand = new RelayCommand(() => _powerService.Restart());
-        SleepCommand = new RelayCommand(() => _powerService.Sleep());
-        HibernateCommand = new RelayCommand(() => _powerService.Hibernate());
-        LockCommand = new RelayCommand(() => _powerService.LockWorkstation());
-        TimedShutdownCommand = new RelayCommand(TimedShutdown);
-        FreeMemoryCommand = new AsyncRelayCommand(FreeMemoryAsync);
         RunStressCommand = new AsyncRelayCommand(RunStressAsync);
         LoadBenchHistoryCommand = new RelayCommand(LoadBenchHistory);
-        CalcPowerCostCommand = new RelayCommand(() => PowerCostText = PowerCostService.Format(PcWatts, PcHoursPerDay, KwhTariff));
         RegistryReadCommand = new RelayCommand(() => RegistryOutput = string.Join("\n", RegistryToolService.ListValues(RegistryPath)));
         RegistryWriteCommand = new RelayCommand(() => { RegistryOutput = RegistryToolService.SetValue(RegistryPath, RegistryName, RegistryValue); _audit.Log("System", "RegistryWrite", RegistryPath); });
         LoadEventsCommand = new RelayCommand(() => EventEntries = new ObservableCollection<EventLogEntry>(EventLogService.Read("Application", 30)));
@@ -105,14 +74,13 @@ public partial class PerformanceViewModel : ViewModelBase
         BitLockerCommand = new RelayCommand(() => TweakStatus = WindowsTweakerService.BitLockerStatus());
 
         InitBenchmarkChart();
-        LoadData();
         LoadBenchHistory();
     }
 
     public override void OnActivated()
     {
         base.OnActivated();
-        LoadData();
+        Fans.OnActivated();
     }
 
     private void InitBenchmarkChart()
@@ -122,57 +90,6 @@ public partial class PerformanceViewModel : ViewModelBase
 
         BenchmarkXAxes = new[] { new Axis { LabelsPaint = transparent, SeparatorsPaint = transparent, TextSize = 0 } };
         BenchmarkYAxes = new[] { new Axis { MinLimit = 0, MaxLimit = 100, LabelsPaint = new SolidColorPaint(new SKColor(255, 255, 255, 60)), SeparatorsPaint = faint, TextSize = 10 } };
-    }
-
-    private void LoadData()
-    {
-        PowerPlans = new ObservableCollection<PowerPlanInfo>(_powerService.GetPowerPlans());
-        ActivePowerPlanName = PowerPlans.FirstOrDefault(p => p.IsActive)?.Name ?? "Balanced";
-
-        var battery = _powerService.GetBatteryInfo();
-        if (battery != null)
-        {
-            HasBattery = true;
-            BatteryInfo = battery;
-
-            // Теперь реальные данные из PowerService (Этап Г) вместо догадок
-            BatteryStatus = battery.Status;
-            BatteryEstimatedTime = battery.TimeRemainingText;
-            BatteryChargeColor = battery.IsCharging
-                ? "#3B82F6" // синий — заряжается
-                : battery.ChargePercent > 50 ? "#22C55E"
-                : battery.ChargePercent > 20 ? "#F59E0B"
-                : "#EF4444";
-        }
-        else
-        {
-            HasBattery = false;
-        }
-    }
-
-    private void ActivatePlan()
-    {
-        if (SelectedPlan == null) return;
-        _powerService.SetActivePowerPlan(SelectedPlan.Guid);
-        LoadData();
-    }
-
-    private void TimedShutdown()
-    {
-        if (!int.TryParse(ShutdownDelayMinutes, out var minutes) || minutes <= 0)
-        {
-            StatusText = "Enter a valid number of minutes";
-            return;
-        }
-        _powerService.Shutdown(minutes * 60);
-        StatusText = $"Shutdown scheduled in {minutes} minutes";
-    }
-
-    private async Task FreeMemoryAsync()
-    {
-        StatusText = "Trimming working sets…";
-        var n = await MemoryTrimmer.TrimAllAsync();
-        StatusText = $"Memory trimmed: {n} processes";
     }
 
     private async Task RunBenchmarks()

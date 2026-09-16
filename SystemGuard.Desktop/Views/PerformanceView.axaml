@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:controls="using:SystemGuard.Desktop.Controls"
              xmlns:models="using:SystemGuard.Desktop.Models"
              xmlns:services="using:SystemGuard.Desktop.Services"
              xmlns:lvc="using:LiveChartsCore.SkiaSharpView.Avalonia"
@@ -65,244 +66,29 @@
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="14" Margin="0,0,0,8">
 
-            <!-- ── Power Plans ───────────────────────────────────────────── -->
-            <Panel>
-                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
-                        BorderBrush="#1FFFFFFF" BorderThickness="1"
-                        BoxShadow="0 10 30 -8 #59000000" Padding="22">
-                    <StackPanel Spacing="12">
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Power Plans" FontSize="14" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextBrush}"/>
-                            <TextBlock Text="{Binding ActivePowerPlanName}" FontSize="11"
-                                       Foreground="{DynamicResource AccentBrush}"
-                                       TextTrimming="CharacterEllipsis" MaxLines="1"/>
-                        </StackPanel>
-
-                        <ListBox ItemsSource="{Binding PowerPlans}"
-                                 SelectedItem="{Binding SelectedPlan}"
-                                 Background="Transparent" BorderThickness="0" MaxHeight="150">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="models:PowerPlanInfo">
-                                    <Border Padding="12,10" CornerRadius="14"
-                                            Background="#14FFFFFF"
-                                            Margin="0,3"
-                                            BorderBrush="#1FFFFFFF" BorderThickness="1">
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Name}"
-                                                           Foreground="{DynamicResource TextBrush}"
-                                                           FontSize="12" FontWeight="SemiBold"
-                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
-                                                <TextBlock Text="{Binding Guid}"
-                                                           Foreground="{DynamicResource TextMutedBrush}"
-                                                           FontSize="8" FontFamily="Consolas"
-                                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
-                                            </StackPanel>
-                                            <Border Grid.Column="1" CornerRadius="10"
-                                                    Padding="8,4" Background="{DynamicResource AccentBrush}"
-                                                    VerticalAlignment="Center"
-                                                    IsVisible="{Binding IsActive}">
-                                                <TextBlock Text="ACTIVE" FontSize="8"
-                                                           FontWeight="Bold"
-                                                           Foreground="{DynamicResource BgBrush}"/>
-                                            </Border>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-
-                        <Button Classes="pill pillPrimary" Content="Activate Plan"
-                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                                Command="{Binding ActivatePlanCommand}"/>
-                    </StackPanel>
-                </Border>
-                <Border CornerRadius="24" IsHitTestVisible="False">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
-                            <GradientStop Color="#1FFFFFFF" Offset="0"/>
-                            <GradientStop Color="#00FFFFFF" Offset="1"/>
-                        </LinearGradientBrush>
-                    </Border.Background>
-                </Border>
-            </Panel>
-
-            <!-- ── Battery ───────────────────────────────────────────────── -->
-            <Panel IsVisible="{Binding HasBattery}">
-                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
-                        BorderBrush="#1FFFFFFF" BorderThickness="1"
-                        BoxShadow="0 10 30 -8 #59000000" Padding="22">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Battery" FontSize="14" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextBrush}"/>
-                        <Grid ColumnDefinitions="*,*,*">
-                            <StackPanel Spacing="6">
-                                <TextBlock Text="CHARGE" FontSize="8"
-                                           Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
-                                <StackPanel Orientation="Horizontal" Spacing="2">
-                                    <TextBlock Text="{Binding BatteryInfo.ChargePercent}"
-                                               FontSize="28" FontWeight="Black"
-                                               Foreground="{DynamicResource TextBrush}"/>
-                                    <TextBlock Text="%" FontSize="13"
-                                               Foreground="{DynamicResource TextMutedBrush}"
-                                               VerticalAlignment="Bottom" Margin="0,0,0,5"/>
-                                </StackPanel>
-                                <ProgressBar Value="{Binding BatteryInfo.ChargePercent}"
-                                             Minimum="0" Maximum="100"
-                                             Height="4" CornerRadius="2"
-                                             Foreground="{Binding BatteryChargeColor}"
-                                             Background="#14FFFFFF"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Spacing="6" Margin="12,0">
-                                <TextBlock Text="STATUS" FontSize="8"
-                                           Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
-                                <TextBlock Text="{Binding BatteryStatus}"
-                                           FontSize="14" FontWeight="Bold"
-                                           Foreground="{DynamicResource TextBrush}"
-                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
-                                <TextBlock Text="{Binding BatteryInfo.WearLevel, StringFormat='Wear: {0:F1}%'}"
-                                           FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="2" Spacing="6">
-                                <TextBlock Text="ESTIMATED" FontSize="8"
-                                           Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
-                                <TextBlock Text="{Binding BatteryEstimatedTime}"
-                                           FontSize="20" FontWeight="Black"
-                                           Foreground="{DynamicResource TextBrush}"
-                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-                <Border CornerRadius="24" IsHitTestVisible="False">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
-                            <GradientStop Color="#1FFFFFFF" Offset="0"/>
-                            <GradientStop Color="#00FFFFFF" Offset="1"/>
-                        </LinearGradientBrush>
-                    </Border.Background>
-                </Border>
-            </Panel>
-
-            <!-- ── System Controls ───────────────────────────────────────── -->
-            <Panel>
-                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
-                        BorderBrush="#1FFFFFFF" BorderThickness="1"
-                        BoxShadow="0 10 30 -8 #59000000" Padding="22">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="System Controls" FontSize="14" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextBrush}"/>
-                        <WrapPanel>
-                            <Button Classes="tile" Command="{Binding ShutdownCommand}" Width="132" Height="76" Margin="0,0,8,8">
-                                <StackPanel Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Path Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14v-4H8l4-4 4 4h-3v4h-2z"
-                                          Fill="{DynamicResource AccentBrush}" Width="18" Height="18" Stretch="Uniform" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Shutdown" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Power off" FontSize="8"
-                                               Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Classes="tile" Command="{Binding RestartCommand}" Width="132" Height="76" Margin="0,0,8,8">
-                                <StackPanel Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Path Data="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"
-                                          Fill="{DynamicResource AccentBrush}" Width="18" Height="18" Stretch="Uniform" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Restart" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Reboot" FontSize="8"
-                                               Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Classes="tile" Command="{Binding SleepCommand}" Width="132" Height="76" Margin="0,0,8,8">
-                                <StackPanel Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Path Data="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
-                                          Fill="{DynamicResource AccentBrush}" Width="18" Height="18" Stretch="Uniform" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Sleep" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Low power" FontSize="8"
-                                               Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Classes="tile" Command="{Binding LockCommand}" Width="132" Height="76" Margin="0,0,8,8">
-                                <StackPanel Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Path Data="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2z"
-                                          Fill="{DynamicResource AccentBrush}" Width="18" Height="18" Stretch="Uniform" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Lock" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Secure" FontSize="8"
-                                               Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Classes="tile" Command="{Binding HibernateCommand}" Width="132" Height="76" Margin="0,0,8,8">
-                                <StackPanel Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Path Data="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"
-                                          Stroke="{DynamicResource AccentBrush}" StrokeThickness="2"
-                                          Width="18" Height="18" Stretch="Uniform" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Hibernate" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Deep sleep" FontSize="8"
-                                               Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Classes="tile" Command="{Binding FreeMemoryCommand}" Width="132" Height="76" Margin="0,0,8,8">
-                                <StackPanel Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Path Data="M13 2L4.5 13.5H11L9.5 22 19 10h-6.5L13 2z"
-                                          Fill="{DynamicResource AccentBrush}" Width="18" Height="18" Stretch="Uniform" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Free Memory" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Trim RAM" FontSize="8"
-                                               Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Border Width="150" Height="76" Margin="0,0,8,8"
-                                    Background="#14FFFFFF"
-                                    BorderBrush="#1FFFFFFF" BorderThickness="1"
-                                    CornerRadius="18">
-                                <StackPanel Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-                                        <TextBox Text="{Binding ShutdownDelayMinutes}"
-                                                 Width="52" Padding="6,4" FontSize="11"
-                                                 Background="{DynamicResource CardBrush}"
-                                                 BorderBrush="#1FFFFFFF"
-                                                 BorderThickness="1" CornerRadius="8"
-                                                 Foreground="{DynamicResource TextBrush}"/>
-                                        <TextBlock Text="min" FontSize="9"
-                                                   Foreground="{DynamicResource TextMutedBrush}"
-                                                   VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                    <Button Classes="pill pillPrimary" Content="Timer Shutdown"
-                                            Padding="10,5" FontSize="10"
-                                            Command="{Binding TimedShutdownCommand}"/>
-                                </StackPanel>
-                            </Border>
-                        </WrapPanel>
-                    </StackPanel>
-                </Border>
-                <Border CornerRadius="24" IsHitTestVisible="False">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
-                            <GradientStop Color="#1FFFFFFF" Offset="0"/>
-                            <GradientStop Color="#00FFFFFF" Offset="1"/>
-                        </LinearGradientBrush>
-                    </Border.Background>
-                </Border>
-            </Panel>
+            <!-- Power Plans живут в Game Mode; Battery / System Controls /
+                 Power cost & CO2 удалены за ненадобностью. -->
+            <!-- ── Fans: обороты + режимы ──────────────────────────────────── -->
+            <ContentControl Content="{Binding Fans}"/>
 
             <!-- ── Benchmarks ────────────────────────────────────────────── -->
             <Panel>
                 <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
                         BorderBrush="#1FFFFFFF" BorderThickness="1"
                         BoxShadow="0 10 30 -8 #59000000" Padding="22">
-                    <StackPanel Spacing="12">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="Benchmarks" FontSize="14" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextBrush}"/>
-                                <TextBlock Text="{Binding StatusText}" FontSize="10"
-                                           Foreground="{DynamicResource TextMutedBrush}"
-                                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                    <StackPanel Spacing="12" IsEnabled="{Binding IsProLicense}">
+                        <Border Background="#33C96C9E" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="14" Padding="14,10"
+                                IsVisible="{Binding !IsProLicense}">
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <controls:LockBadge VerticalAlignment="Center" />
+                                <TextBlock Text="PRO: бенчмарки и стресс-тесты — с Pro-лицензией."
+                                           FontSize="11" Foreground="{DynamicResource TextBrush}"
+                                           VerticalAlignment="Center" TextWrapping="Wrap"/>
                             </StackPanel>
+                        </Border>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Benchmarks" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextBrush}"/>
                             <Button Grid.Column="1" Classes="pill pillPrimary" Content="Run All Tests"
                                     Command="{Binding RunBenchmarksCommand}"
                                     IsEnabled="{Binding !IsBenchmarking}" VerticalAlignment="Center"/>
@@ -430,39 +216,16 @@
                 </Border>
             </Panel>
 
-            <!-- ── Power cost ──────────────────────────────────────────────── -->
-            <Panel>
-                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
-                        BorderBrush="#1FFFFFFF" BorderThickness="1"
-                        BoxShadow="0 10 30 -8 #59000000" Padding="22">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="Power cost &amp; CO₂" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
-                        <Grid ColumnDefinitions="*,*,*,Auto">
-                            <TextBox Text="{Binding PcWatts}" Watermark="Watts" Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0"/>
-                            <TextBox Grid.Column="1" Text="{Binding PcHoursPerDay}" Watermark="Hours/day" Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0"/>
-                            <TextBox Grid.Column="2" Text="{Binding KwhTariff}" Watermark="Tariff" Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0"/>
-                            <Button Grid.Column="3" Classes="pill pillGlass" Content="Calculate" Command="{Binding CalcPowerCostCommand}"/>
-                        </Grid>
-                        <TextBlock Text="{Binding PowerCostText}" FontSize="11" Foreground="{DynamicResource AccentBrush}"/>
-                    </StackPanel>
-                </Border>
-                <Border CornerRadius="24" IsHitTestVisible="False">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
-                            <GradientStop Color="#1FFFFFFF" Offset="0"/>
-                            <GradientStop Color="#00FFFFFF" Offset="1"/>
-                        </LinearGradientBrush>
-                    </Border.Background>
-                </Border>
-            </Panel>
-
             <!-- ── System tools: registry / events / devices / tweaks ─────── -->
             <Panel>
                 <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
                         BorderBrush="#1FFFFFFF" BorderThickness="1"
                         BoxShadow="0 10 30 -8 #59000000" Padding="22">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="System tools" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                    <StackPanel Spacing="12" IsEnabled="{Binding IsProLicense}">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="System tools" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <controls:LockBadge VerticalAlignment="Center" IsVisible="{Binding !IsProLicense}" />
+                        </StackPanel>
                         <Grid ColumnDefinitions="*,*,*,Auto">
                             <TextBox Text="{Binding RegistryPath}" Watermark="HKCU path" Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontFamily="Consolas" FontSize="11"/>
                             <TextBox Grid.Column="1" Text="{Binding RegistryName}" Watermark="Name" Background="#14FFFFFF" BorderThickness="0" CornerRadius="12" Foreground="{DynamicResource TextBrush}" Padding="12,8" Margin="0,0,8,0" FontSize="11"/>
@@ -474,7 +237,6 @@
                         </Grid>
                         <TextBlock Text="{Binding RegistryOutput}" FontSize="10" FontFamily="Consolas" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" MaxLines="6"/>
                         <WrapPanel>
-                            <Button Classes="pill pillGlass" Content="Event log" Command="{Binding LoadEventsCommand}" Margin="0,0,8,8"/>
                             <Button Classes="pill pillGlass" Content="Devices" Command="{Binding LoadDevicesCommand}" Margin="0,0,8,8"/>
                             <Button Classes="pill pillGhost" Content="Device Manager" Command="{Binding OpenDevicesCommand}" Margin="0,0,8,8"/>
                             <Button Classes="pill pillGhost" Content="Telemetry OFF" Command="{Binding TelemetryOffCommand}" Margin="0,0,8,8"/>
@@ -482,15 +244,6 @@
                             <Button Classes="pill pillGhost" Content="BitLocker" Command="{Binding BitLockerCommand}" Margin="0,0,8,8"/>
                         </WrapPanel>
                         <TextBlock Text="{Binding TweakStatus}" FontSize="11" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap"/>
-                        <ItemsControl ItemsSource="{Binding EventEntries}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="services:EventLogEntry">
-                                    <TextBlock FontSize="10" FontFamily="Consolas" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2">
-                                        <Run Text="{Binding Time, StringFormat='{}{0:g}'}"/><Run Text=" "/><Run Text="{Binding Level}"/><Run Text=" "/><Run Text="{Binding Source}"/><Run Text=": "/><Run Text="{Binding Message}"/>
-                                    </TextBlock>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
                         <ItemsControl ItemsSource="{Binding Devices}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="services:DeviceEntry">

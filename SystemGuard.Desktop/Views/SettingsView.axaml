@@ -34,57 +34,90 @@
         <Style Selector="Button.pill:disabled">
             <Setter Property="Opacity" Value="0.4"/>
         </Style>
+        <Style Selector="Button.segment">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="RenderTransform" Value="scale(1)"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.segment:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.94)"/>
+        </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,Auto,*">
+    <Grid RowDefinitions="Auto,*">
 
+        <!-- Droplet-табы с анимацией перетекания, как везде: General / Colors / Telegram / License -->
         <Border Grid.Row="0" Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
                 BorderThickness="1" CornerRadius="20" Padding="8" Margin="0,0,0,12">
-            <WrapPanel HorizontalAlignment="Center">
-                <Button Classes="pill" Content="General" Margin="0,0,8,8"
-                        Command="{Binding SelectTabCommand}" CommandParameter="General"
-                        Background="{Binding IsGeneralTab, Converter={StaticResource BoolToAccentBrushConverter}}"
-                        Foreground="{Binding IsGeneralTab, Converter={StaticResource BoolToForegroundConverter}}"/>
-                <Button Classes="pill" Content="Appearance" Margin="0,0,8,8"
-                        Command="{Binding SelectTabCommand}" CommandParameter="Appearance"
-                        Background="{Binding IsAppearanceTab, Converter={StaticResource BoolToAccentBrushConverter}}"
-                        Foreground="{Binding IsAppearanceTab, Converter={StaticResource BoolToForegroundConverter}}"/>
-                <Button Classes="pill" Content="Colors" Margin="0,0,8,8"
-                        Command="{Binding SelectTabCommand}" CommandParameter="Colors"
-                        Background="{Binding IsColorsTab, Converter={StaticResource BoolToAccentBrushConverter}}"
-                        Foreground="{Binding IsColorsTab, Converter={StaticResource BoolToForegroundConverter}}"/>
-                <Button Classes="pill" Content="Telegram" Margin="0,0,8,8"
-                        Command="{Binding SelectTabCommand}" CommandParameter="Telegram"
-                        Background="{Binding IsTelegramTab, Converter={StaticResource BoolToAccentBrushConverter}}"
-                        Foreground="{Binding IsTelegramTab, Converter={StaticResource BoolToForegroundConverter}}"/>
-                <Button Classes="pill" Content="Scheduler" Margin="0,0,8,8"
-                        Command="{Binding SelectTabCommand}" CommandParameter="Scheduler"
-                        Background="{Binding IsSchedulerTab, Converter={StaticResource BoolToAccentBrushConverter}}"
-                        Foreground="{Binding IsSchedulerTab, Converter={StaticResource BoolToForegroundConverter}}"/>
-                <Button Classes="pill" Content="License" Margin="0,0,8,0"
-                        Command="{Binding SelectTabCommand}" CommandParameter="License"
-                        Background="{Binding IsLicenseTab, Converter={StaticResource BoolToAccentBrushConverter}}"
-                        Foreground="{Binding IsLicenseTab, Converter={StaticResource BoolToForegroundConverter}}"/>
-            </WrapPanel>
+            <Border Width="536" Height="44" CornerRadius="22" Background="{DynamicResource CardBrush}"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1" ClipToBounds="True" Padding="4"
+                    HorizontalAlignment="Center">
+                <Panel Width="528" Height="36" ClipToBounds="True">
+                    <Border x:Name="TabIndicator" Width="132" Height="36" CornerRadius="18"
+                            Background="{DynamicResource AccentBrush}"
+                            HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <Border.Transitions>
+                            <Transitions>
+                                <ThicknessTransition Property="Margin" Duration="0:0:0.5" Easing="CubicEaseInOut"/>
+                            </Transitions>
+                        </Border.Transitions>
+                    </Border>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Width="132" Height="36" Classes="segment" Click="GeneralTab_Click">
+                            <TextBlock Text="General" FontSize="11.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                       Foreground="{Binding IsGeneralTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                        </Button>
+                        <Button Width="132" Height="36" Classes="segment" Click="ColorsTab_Click">
+                            <TextBlock Text="Colors" FontSize="11.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                       Foreground="{Binding IsColorsTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                        </Button>
+                        <Button Width="132" Height="36" Classes="segment" Click="TelegramTab_Click">
+                            <TextBlock Text="Telegram" FontSize="11.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                       Foreground="{Binding IsTelegramTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                        </Button>
+                        <Button Width="132" Height="36" Classes="segment" Click="LicenseTab_Click">
+                            <TextBlock Text="License" FontSize="11.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
+                                       Foreground="{Binding IsLicenseTab, Converter={StaticResource BoolToForegroundConverter}}"/>
+                        </Button>
+                    </StackPanel>
+                </Panel>
+            </Border>
         </Border>
 
-        <Border Grid.Row="1" Background="#14FFFFFF" CornerRadius="16" Padding="16,12" Margin="0,0,0,12"
-                BorderBrush="#1FFFFFFF" BorderThickness="1"
-                IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-            <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource AccentBrush}" FontSize="11"/>
-        </Border>
+        <!-- Контент вкладок: одна строка, без прыжков. Статус — оверлей сверху,
+             а не отдельная строка (иначе License/About съезжали вниз). -->
+        <Panel Grid.Row="1">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                          IsVisible="{Binding IsGeneralTab}">
+                <StackPanel Spacing="14" Margin="0,0,0,8">
 
-        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
-                      IsVisible="{Binding IsGeneralTab}">
-        <StackPanel Spacing="14" Margin="0,0,0,8">
-
-            <!-- Account (Google / Apple) -->
+            <!-- Account (Google / Apple) — скоро. Пока неактивно. -->
             <Panel>
                 <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
                         BorderBrush="#1FFFFFFF" BorderThickness="1"
                         BoxShadow="0 10 30 -8 #59000000" Padding="22">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Account" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                    <StackPanel Spacing="12" IsEnabled="False">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Account" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <Border Grid.Column="1" CornerRadius="10" Padding="10,4" VerticalAlignment="Center"
+                                    Background="#14FFFFFF" BorderBrush="#1FFFFFFF" BorderThickness="1">
+                                <TextBlock Text="Soon…" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource AccentLightBrush}"/>
+                            </Border>
+                        </Grid>
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="3" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding AccountEmail}" FontSize="13" FontWeight="SemiBold"
@@ -136,26 +169,10 @@
                                Foreground="{DynamicResource TextBrush}" Margin="0,0,0,8"/>
                     <Grid ColumnDefinitions="*,Auto" Margin="0,8">
                         <StackPanel Spacing="3">
-                            <TextBlock Text="Dark Theme" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
-                            <TextBlock Text="Enable dark mode interface" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.DarkTheme}"/>
-                    </Grid>
-                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,8">
-                        <StackPanel Spacing="3">
                             <TextBlock Text="Start with Windows" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
                             <TextBlock Text="Launch on system startup" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
                         </StackPanel>
                         <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.StartWithWindows}"/>
-                    </Grid>
-                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,8">
-                        <StackPanel Spacing="3">
-                            <TextBlock Text="Minimize to Tray" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
-                            <TextBlock Text="Minimize to system tray" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.MinimizeToTray}"/>
                     </Grid>
                     <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
                     <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
@@ -176,27 +193,58 @@
                     <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
                     <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
                         <StackPanel Spacing="3">
-                            <TextBlock Text="Show Tray Icon" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
-                            <TextBlock Text="Keep icon in system tray" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.ShowTrayIcon}"/>
-                    </Grid>
-                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
-                        <StackPanel Spacing="3">
                             <TextBlock Text="Notifications" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
                             <TextBlock Text="System event notifications" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
                         </StackPanel>
                         <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.ShowNotifications}"/>
                     </Grid>
-                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
-                        <Slider Value="{Binding Settings.MonitoringIntervalMs}" Minimum="500" Maximum="5000"
-                                TickFrequency="500" IsSnapToTickEnabled="True" Width="220"
-                                VerticalAlignment="Center" Margin="0,0,12,0"/>
-                        <TextBlock Grid.Column="1" Text="{Binding Settings.MonitoringIntervalMs, StringFormat='Monitor: {0} ms'}"
-                                   FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Widgets (переехали из удалённой вкладки Appearance) -->
+            <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
+                    BorderThickness="1" CornerRadius="24" Padding="22"
+                    BoxShadow="0 8 24 -8 #4D000000">
+                <StackPanel Spacing="0">
+                    <TextBlock Text="Widgets" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextBrush}" Margin="0,0,0,8"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Show widgets" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="Floating desktop overlays, top right" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Appearance.WidgetsEnabled}"/>
                     </Grid>
+                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8">
+                        <TextBlock Text="Clock" FontSize="12" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Appearance.ShowClock}"/>
+                    </Grid>
+                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8">
+                        <TextBlock Text="System (CPU / RAM)" FontSize="12" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Appearance.ShowSystem}"/>
+                    </Grid>
+                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8">
+                        <TextBlock Text="Weather" FontSize="12" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Appearance.ShowWeather}"/>
+                    </Grid>
+                    <Border Height="1" Background="#14FFFFFF" Margin="0,4"/>
+                    <Grid ColumnDefinitions="*,*" Margin="0,8,0,0">
+                        <TextBox Text="{Binding Appearance.City}" Watermark="City"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                 Foreground="{DynamicResource TextBrush}" Padding="14,10" Margin="0,0,8,0"/>
+                        <Grid Grid.Column="1" ColumnDefinitions="*,Auto">
+                            <Slider Value="{Binding Appearance.WeatherInterval}" Minimum="60" Maximum="3600"
+                                    VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Appearance.WeatherInterval, StringFormat='{}{0}s'}"
+                                       FontSize="10" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Grid>
+                    <TextBlock Text="{Binding Appearance.StatusText}" FontSize="10"
+                               Foreground="{DynamicResource AccentLightBrush}" TextWrapping="Wrap" MaxLines="2" Margin="0,8,0,0"
+                               IsVisible="{Binding Appearance.StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                 </StackPanel>
             </Border>
 
@@ -230,58 +278,91 @@
                                 Margin="0,0,8,8" Command="{Binding ResetCommand}"/>
                         <Button Classes="pill pillGlass" Content="Check Updates"
                                 Margin="0,0,8,8" Command="{Binding CheckUpdateCommand}" IsEnabled="{Binding !IsCheckingUpdate}"/>
-                        <Button Classes="pill pillGhost" Content="App Data"
-                                Margin="0,0,8,8" Command="{Binding OpenAppDataCommand}"/>
-                        <Button Classes="pill pillPrimary" Content="Download update"
-                                Margin="0,0,8,8" Command="{Binding OpenReleasePageCommand}"
+                        <Button Classes="pill pillPrimary" Content="Download &amp; install update"
+                                Margin="0,0,8,8" Command="{Binding InstallUpdateCommand}"
                                 IsVisible="{Binding IsUpdateAvailable}"/>
                     </WrapPanel>
+                    <ProgressBar Value="{Binding UpdateProgress}" Minimum="0" Maximum="100" Height="4" CornerRadius="2"
+                                 Foreground="{DynamicResource AccentBrush}" Background="#14FFFFFF"
+                                 IsVisible="{Binding IsDownloadingUpdate}"/>
+                    <!-- Статус Check Updates/Save: раньше StatusText нигде не показывался,
+                         поэтому кнопка выглядела мёртвой. -->
+                    <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentLightBrush}" TextWrapping="Wrap" MaxLines="2"
+                               IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                     <TextBlock FontSize="10" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap">
                         <Run Text="Last check: "/><Run Text="{Binding Settings.LastCheckUpdate}"/>
                         <Run Text="   Latest: "/><Run Text="{Binding LatestVersion}"/>
                     </TextBlock>
-                    <TextBlock Text="Telegram and Scheduler live in their tabs above."
+                    <TextBlock Text="Telegram remote lives in its tab above."
                                FontSize="10" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
-            <!-- About -->
+            <!-- About: строгая карточка без налезаний.
+                 Фикс каши: иконка 52x52 в отдельной колонке 52 (не Auto),
+                 тексты в колонке * с TextWrapping, ClipToBounds, без отрицательных
+                 отступов; Expander'ы растянуты на всю ширину. -->
             <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
                     BorderThickness="1" CornerRadius="24" Padding="22"
-                    BoxShadow="0 8 24 -8 #4D000000">
-                <StackPanel Spacing="10">
+                    BoxShadow="0 8 24 -8 #4D000000"
+                    ClipToBounds="True">
+                <StackPanel Spacing="12">
                     <TextBlock Text="About" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
-                    <Grid ColumnDefinitions="Auto,*">
-                        <Border CornerRadius="14" Width="44" Height="44" Margin="0,0,14,0">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                    <GradientStop Color="{DynamicResource AccentColor}" Offset="0"/>
-                                    <GradientStop Color="{DynamicResource AccentLightColor}" Offset="1"/>
-                                </LinearGradientBrush>
-                            </Border.Background>
-                            <TextBlock Text="SG" FontSize="16" FontWeight="Black" Foreground="{DynamicResource BgBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Grid ColumnDefinitions="52,*" VerticalAlignment="Top">
+                        <Border Grid.Column="0" CornerRadius="14" Width="52" Height="52"
+                                VerticalAlignment="Top" HorizontalAlignment="Left"
+                                Background="#0F1F3C" BorderBrush="#1FFFFFFF" BorderThickness="1">
+                            <TextBlock Text="SG" FontSize="17" FontWeight="Black" Foreground="White"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <StackPanel Spacing="3" VerticalAlignment="Center">
-                            <TextBlock Text="System Guard" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
-                            <TextBlock Text="{Binding Settings.Version, StringFormat='Version {0}'}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
+                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Top" Margin="14,0,0,0">
+                            <TextBlock Text="{Binding AboutTitle}" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"
+                                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                            <TextBlock Text="{Binding AboutSubtitle}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                                       TextWrapping="Wrap" MaxLines="2"/>
+                            <TextBlock Text="{Binding Settings.Version, StringFormat='Version {0}'}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                       TextWrapping="NoWrap"/>
                         </StackPanel>
                     </Grid>
+                    <Border Height="1" Background="#14FFFFFF"/>
+                    <TextBlock Text="{Binding StarsOwnerText}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" MaxLines="2"/>
+                    <TextBlock Text="{Binding RemoteHelpText}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" MaxLines="4"/>
+                    <Expander Header="Privacy Policy" FontSize="12" Foreground="{DynamicResource TextBrush}"
+                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                        <ScrollViewer MaxHeight="220" HorizontalScrollBarVisibility="Disabled">
+                            <TextBlock Text="{Binding PrivacyText}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                                       TextWrapping="Wrap" FontFamily="Consolas" MaxWidth="640"/>
+                        </ScrollViewer>
+                    </Expander>
+                    <Expander Header="Terms of Use" FontSize="12" Foreground="{DynamicResource TextBrush}"
+                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                        <ScrollViewer MaxHeight="220" HorizontalScrollBarVisibility="Disabled">
+                            <TextBlock Text="{Binding TermsText}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                                       TextWrapping="Wrap" FontFamily="Consolas" MaxWidth="640"/>
+                        </ScrollViewer>
+                    </Expander>
+                    <Expander Header="Safety — что нельзя делать" FontSize="12" Foreground="{DynamicResource DangerBrush}"
+                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                        <ScrollViewer MaxHeight="260" HorizontalScrollBarVisibility="Disabled">
+                            <TextBlock Text="{Binding SafetyText}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                                       TextWrapping="Wrap" FontFamily="Consolas" MaxWidth="640"/>
+                        </ScrollViewer>
+                    </Expander>
                 </StackPanel>
             </Border>
 
-        </StackPanel>
-    </ScrollViewer>
+                </StackPanel>
+            </ScrollViewer>
 
-        <!-- Appearance — оформление Windows/таскбар/док/виджеты -->
-        <ContentControl Grid.Row="2" Content="{Binding Appearance}" IsVisible="{Binding IsAppearanceTab}"/>
-        <!-- Colors — полная палитра + свои профили -->
-        <ContentControl Grid.Row="2" Content="{Binding Colors}" IsVisible="{Binding IsColorsTab}"/>
-        <!-- Telegram — бот и удалённое управление -->
-        <ContentControl Grid.Row="2" Content="{Binding Telegram}" IsVisible="{Binding IsTelegramTab}"/>
-        <!-- Scheduler — задачи и автоматизация -->
-        <ContentControl Grid.Row="2" Content="{Binding Scheduler}" IsVisible="{Binding IsSchedulerTab}"/>
-        <!-- License — активация и тарифы -->
-        <ContentControl Grid.Row="2" Content="{Binding License}" IsVisible="{Binding IsLicenseTab}"/>
+            <!-- Остальные подвкладки: одинаковый контейнер, прижаты к верху. -->
+            <ContentControl Content="{Binding Colors}" IsVisible="{Binding IsColorsTab}"
+                            VerticalAlignment="Top" HorizontalAlignment="Stretch"/>
+            <ContentControl Content="{Binding Telegram}" IsVisible="{Binding IsTelegramTab}"
+                            VerticalAlignment="Top" HorizontalAlignment="Stretch"/>
+            <ContentControl Content="{Binding License}" IsVisible="{Binding IsLicenseTab}"
+                            VerticalAlignment="Top" HorizontalAlignment="Stretch"/>
+        </Panel>
 
     </Grid>
 </UserControl>

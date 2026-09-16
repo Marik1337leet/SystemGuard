@@ -243,14 +243,28 @@ public sealed class TelegramBotService : IDisposable
                 await SendHtml(cid2, "<b>Unauthorized.</b>\nYour chat ID: <code>" + cid2 + "</code>").ConfigureAwait(false);
                 return;
             }
+            // Машинный relay от Android-приложения (работает вне дома без туннеля).
+            // Обычные пользователи чата эти пакеты не шлют — ветка им не мешает.
+            if (BotRelayProtocol.IsRelayRequest(msg.Text))
+            {
+                Log("relay:" + Trim(msg.Text, 120), cid2);
+                await HandleRelayRequest(msg.Text, cid2).ConfigureAwait(false);
+                return;
+            }
             Log(Trim(msg.Text, 120), cid2);
             await HandleCommand(msg.Text, cid2).ConfigureAwait(false);
         }
     }
 
-    private async Task HandleWebAppData(string data, long cid)
+    /// <summary>
+    /// Чистый мэппинг WebApp→команда (без бота): sendData из WebApp, кнопки
+    /// и копипаста из чата. Покрыт тестами; HandleWebAppData — тонкая
+    /// обвязка поверх него.
+    /// </summary>
+    public static bool TryParseWebAppData(string? data, out string action, out string arg)
     {
-        string action = "", arg = "";
+        action = ""; arg = "";
+        if (string.IsNullOrWhiteSpace(data)) return false;
         try
         {
             using var doc = JsonDocument.Parse(data);
@@ -270,12 +284,116 @@ public sealed class TelegramBotService : IDisposable
         action = action.Trim().TrimStart('/').ToLowerInvariant();
         if (action is "dashboard" or "info" or "power") action = "status";
         if (action == "pause") action = "play";
+        arg = (arg ?? "").Trim();
+        if (arg.Length > 8192) arg = arg[..8192];
+        return action.Length > 0;
+    }
 
+    private async Task HandleWebAppData(string data, long cid)
+    {
+        if (!TryParseWebAppData(data, out var action, out var arg)) return;
         await HandleCommand("/" + action + (string.IsNullOrWhiteSpace(arg) ? "" : " " + arg.Trim()), cid)
             .ConfigureAwait(false);
     }
 
-    private static string ExtractCommand(string text)
+    // ── Bot Relay: Android ↔ ПК через Telegram (вне дома, без туннеля) ─────
+    // Телефон шлёт 🤖SG:{...}, ПК исполняет через тот же RemoteActions и отвечает
+    // ОБЫЧНЫМ текстом в тот же чат (машинных пакетов нет: свои сообщения бот
+    // через getUpdates не видит, парсить ответ в приложении невозможно —
+    // человек читает его в чате). Скриншоты/камера идут обычной фоткой
+    // с подписью [relay:id].
+    private async Task HandleRelayRequest(string text, long cid)
+    {
+        var req = BotRelayProtocol.TryParseRequest(text);
+        if (req == null) return; // битый пакет — молча игнорируем, не спамим чат
+        var admin = IsAdmin(cid);
+        if (!admin && !BotRelayProtocol.IsReadOnlyAction(req.Action))
+        {
+            await SendRelayText(cid, BotRelayProtocol.FormatReply(req.Action, false, "Admins only")).ConfigureAwait(false);
+            return;
+        }
+        try
+        {
+            // Скрин/камера: сначала текст, потом фото (фото может не влезть,
+            // а текстовый ответ уже в чате).
+            if (req.Action is "screenshot" or "shot")
+            {
+                await SendRelayText(cid, "Uploading screenshot…").ConfigureAwait(false);
+                await SendScreenshotToChat(cid, "[relay:" + req.Id + "]").ConfigureAwait(false);
+                return;
+            }
+            if (req.Action is "cam" or "camera")
+            {
+                await SendRelayText(cid, "Uploading camera frame…").ConfigureAwait(false);
+                await SendWebcamToChat(cid, "[relay:" + req.Id + "]").ConfigureAwait(false);
+                return;
+            }
+            var result = await RemoteActions.ExecuteAsync(req.Action, req.Arg).ConfigureAwait(false);
+            var (ok, message, output) = FlattenResult(result);
+            await SendRelayText(cid, BotRelayProtocol.FormatReply(req.Action, ok, message, output)).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            await SendRelayText(cid, BotRelayProtocol.FormatReply(req.Action, false, Trim(ex.Message, 200))).ConfigureAwait(false);
+        }
+    }
+
+    private static (bool Ok, string Message, string Output) FlattenResult(object result)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(result);
+            using var doc = JsonDocument.Parse(json);
+            var r = doc.RootElement;
+            bool ok = !r.TryGetProperty("ok", out var o) || o.ValueKind == JsonValueKind.True;
+            string Str(string name)
+            {
+                if (!r.TryGetProperty(name, out var v)) return "";
+                return v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : v.GetRawText();
+            }
+            var message = Str("message");
+            var output = Str("output");
+            if (string.IsNullOrEmpty(message) && !string.IsNullOrEmpty(output)) message = output;
+            if (string.IsNullOrEmpty(message)) message = ok ? "OK" : "Error";
+            return (ok, message, output);
+        }
+        catch
+        {
+            return (true, result?.ToString() ?? "OK", "");
+        }
+    }
+
+    // Plain text без HTML-парсинга: внутри выводов команд скобки/уголки,
+    // парсер их ломает. Человек читает ответ в чате.
+    private Task SendRelayText(long cid, string text)
+    {
+        return ThrottledSend(cid, (chat, ct) =>
+            _botClient!.SendTextMessageAsync(chat, text, cancellationToken: ct));
+    }
+
+    /// <summary>
+    /// Автопуш свежей live-ссылки владельцу (после Publish и каждого реконнекта
+    /// туннеля). Иначе вне дома телефон хранит мёртвый URL и "ничего не работает".
+    /// Вызывается из UI при смене LiveServices.Tunnel.PublicUrl.
+    /// </summary>
+    public Task PushLiveUrlAsync(string url, string provider)
+    {
+        try
+        {
+            if (!Ready() || !IsConfigured) return Task.CompletedTask;
+            if (!long.TryParse(_chatId, out var id)) return Task.CompletedTask;
+            var html = "<b>Live доступ обновлён.</b>\n\n" +
+                $"Транспорт: <code>{Esc(provider)}</code>\n" +
+                $"Ссылка: <code>{Esc(url)}</code>\n" +
+                $"Токен: <code>{Esc(LiveServices.Token)}</code>\n\n" +
+                "В приложении: Статус → вставить ссылку + токен → Связать.\n" +
+                "<i>Старая ссылка больше не работает — туннель её сменил сам.</i>";
+            return SendHtml(id, html);
+        }
+        catch { return Task.CompletedTask; }
+    }
+
+    public static string ExtractCommand(string text)
     {
         var parts = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         foreach (var part in parts)
@@ -288,7 +406,7 @@ public sealed class TelegramBotService : IDisposable
         return text.ToLower().Trim();
     }
 
-    private static string ExtractArg(string text)
+    public static string ExtractArg(string text)
     {
         var i = text.IndexOf(' ');
         return i < 0 ? "" : text[(i + 1)..].Trim().Trim('"');
@@ -358,12 +476,13 @@ public sealed class TelegramBotService : IDisposable
                 break;
             case "/screenshot": await SendScreenshotToChat(cid).ConfigureAwait(false); break;
             case "/stream":
-                StartScreenStream(cid);
-                await SendHtml(cid, "<b>Live screen started</b> (1 frame / 2.5s, auto-stop in 5 min).\n/stop — end").ConfigureAwait(false);
+                // Фото-спам в чат убран: видео живёт внутри WebApp (до 60 FPS, весь экран).
+                // Одиночные кадры — /screenshot и /cam.
+                await SendStreamHint(cid).ConfigureAwait(false);
                 break;
             case "/stop":
                 StopScreenStream(cid);
-                await SendHtml(cid, "Stream stopped.").ConfigureAwait(false);
+                await SendHtml(cid, "Chat photo-stream is off. Video lives in the <b>Web App → Экран</b> tab.").ConfigureAwait(false);
                 break;
             case "/cam": await SendWebcamToChat(cid).ConfigureAwait(false); break;
             case "/mute":
@@ -416,6 +535,16 @@ public sealed class TelegramBotService : IDisposable
                     default: await ShowLicenseMenu(cid).ConfigureAwait(false); break;
                 }
                 break;
+            // Алиасы для релиза: пользователь из рекламы ищет /buy и /tariffs.
+            case "/buy": await ShowLicenseMenu(cid).ConfigureAwait(false); break;
+            case "/tariffs": case "/tariff": case "/prices": case "/pro":
+                await SendTariffs(cid).ConfigureAwait(false); break;
+            case "/trial":
+                await SendHtml(cid,
+                    "<b>Free trial — 14 дней Pro</b>\n\n" +
+                    "Триал включается в самом приложении: <b>Settings → License → Start 14-day trial</b>.\n" +
+                    "Привязывается к этому ПК, второй раз взять нельзя.").ConfigureAwait(false);
+                break;
             case "/files":
                 await SendHtml(cid,
                     "<b>Files</b>\n• <code>/ls C:\\</code> — list folder\n• <code>/get C:\\file.txt</code> — download from PC\n• Send any file/photo — it lands in <b>Desktop\\TG Downloads</b>").ConfigureAwait(false);
@@ -459,6 +588,38 @@ public sealed class TelegramBotService : IDisposable
                 await Ask(cid, "<b>Enter CMD command:</b>").ConfigureAwait(false);
                 break;
 
+            case "/privacy": await SendHtml(cid, "<pre>" + Esc(PoliciesService.Privacy) + "</pre>").ConfigureAwait(false); break;
+            case "/terms": await SendHtml(cid, "<pre>" + Esc(PoliciesService.Terms) + "</pre>").ConfigureAwait(false); break;
+            case "/safety": case "/warning": case "/danger":
+                await SendHtml(cid, "<pre>" + Esc(PoliciesService.Safety) + "</pre>").ConfigureAwait(false); break;
+            case "/wake":
+                await SendHtml(cid, Esc(RemoteInputService.WakeOnly())).ConfigureAwait(false);
+                break;
+            case "/unlock":
+                if (!await RequireAdmin(cid).ConfigureAwait(false)) break;
+                if (string.IsNullOrWhiteSpace(arg))
+                {
+                    SetPending(cid, async v => await UnlockWithPassword(cid, v).ConfigureAwait(false));
+                    await Ask(cid, "<b>Enter Windows password</b> (it will be typed on the lock screen, message is deleted from chat history if you delete it):").ConfigureAwait(false);
+                    break;
+                }
+                await UnlockWithPassword(cid, arg).ConfigureAwait(false);
+                break;
+            case "/wol":
+                if (!await RequireAdmin(cid).ConfigureAwait(false)) break;
+                if (string.IsNullOrWhiteSpace(arg))
+                {
+                    SetPending(cid, async v => await SendHtml(cid, Esc(WakeOnLanService.Send(v.Trim()))).ConfigureAwait(false));
+                    await Ask(cid, "<b>Enter MAC</b> (AA:BB:CC:DD:EE:FF [broadcast]):\n<i>Works in LAN / via router with WoL-forward / VPN. PC off = bot off, so send from a second device or router.</i>").ConfigureAwait(false);
+                    break;
+                }
+                await SendHtml(cid, Esc(WakeOnLanService.Send(arg.Split(' ')[0], arg.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 1 ? arg.Split(' ')[1] : "255.255.255.255"))).ConfigureAwait(false);
+                break;
+            case "/hibernate":
+                if (!await RequireAdmin(cid).ConfigureAwait(false)) break;
+                await Exec("shutdown /h").ConfigureAwait(false);
+                await SendHtml(cid, "PC is hibernating.").ConfigureAwait(false);
+                break;
             case "/ip": await SendHtml(cid, await GetIpCard().ConfigureAwait(false)).ConfigureAwait(false); break;
             case "/ping":
                 await SendHtml(cid, "<i>Pinging 8.8.8.8…</i>").ConfigureAwait(false);
@@ -469,6 +630,50 @@ public sealed class TelegramBotService : IDisposable
                 break;
             case "/battery": await SendHtml(cid, Esc(GetBatteryLine())).ConfigureAwait(false); break;
             case "/free": await SendHtml(cid, Esc(GetFreeSpace())).ConfigureAwait(false); break;
+            case "/perf": await SendHtml(cid, "<pre>" + Esc(PerfText()) + "</pre>").ConfigureAwait(false); break;
+            case "/sysinfo": await SendHtml(cid, "<pre>" + Esc(SysInfoText()) + "</pre>").ConfigureAwait(false); break;
+            case "/startup":
+                if (!await RequireAdmin(cid).ConfigureAwait(false)) break;
+                await SendHtml(cid, "<pre>" + Esc(StartupText()) + "</pre>").ConfigureAwait(false);
+                break;
+            case "/netstat":
+                await SendHtml(cid, "<i>Reading connections…</i>").ConfigureAwait(false);
+                await SendMsg(cid, await Exec("netstat -ano | findstr ESTABLISHED").ConfigureAwait(false)).ConfigureAwait(false);
+                break;
+            case "/wifi":
+                await SendHtml(cid, "<i>Scanning Wi-Fi…</i>").ConfigureAwait(false);
+                await SendMsg(cid, await Exec("netsh wlan show networks mode=bssid").ConfigureAwait(false)).ConfigureAwait(false);
+                break;
+            case "/defender": await SendHtml(cid, "<pre>" + Esc(SecurityService.DefenderStatus()) + "</pre>").ConfigureAwait(false); break;
+            case "/plans":
+                await SendHtml(cid, "<pre>" + Esc(PowerPlansText()) + "</pre>").ConfigureAwait(false);
+                break;
+            case "/remote":
+                await SendHtml(cid, "<b>Remote access</b>\n<pre>" +
+                    Esc(RemoteAccessService.StatusText()) + "</pre>").ConfigureAwait(false);
+                break;
+            case "/fan": await SendHtml(cid, "<pre>" + Esc(FanControlService.StatusText()) + "</pre>").ConfigureAwait(false); break;
+            case "/fan_mode":
+                if (string.IsNullOrWhiteSpace(arg))
+                    await SendHtml(cid, "Use: <code>/fan_mode Auto|Silent|Balanced|Performance|Manual[:percent]</code>").ConfigureAwait(false);
+                else
+                {
+                    var parts = arg.Split(':', StringSplitOptions.RemoveEmptyEntries);
+                    int pct = 50;
+                    if (parts.Length > 1) int.TryParse(new string(parts[1].Where(char.IsDigit).ToArray()), out pct);
+                    await SendHtml(cid, Esc(FanControlService.ApplyMode(parts[0].Trim(), pct))).ConfigureAwait(false);
+                }
+                break;
+            case "/hotkey":
+                if (string.IsNullOrWhiteSpace(arg))
+                    await SendHtml(cid, "Use: <code>/hotkey optimize|gameboost|widget|screenshot|mute|lock</code>").ConfigureAwait(false);
+                else
+                    await SendHtml(cid, Esc(await HotkeyActionRunner.RunAsync(arg.Split(' ')[0]).ConfigureAwait(false))).ConfigureAwait(false);
+                break;
+            case "/eventlog":
+                if (!await RequireAdmin(cid).ConfigureAwait(false)) break;
+                await SendMsg(cid, await Exec("wevtutil qe System /c:15 /f:text /rd:true").ConfigureAwait(false)).ConfigureAwait(false);
+                break;
             case "/users":
                 int au, ad;
                 lock (_stateLock) { au = _authorizedUsers.Count; ad = _adminUsers.Count; }
@@ -509,6 +714,10 @@ public sealed class TelegramBotService : IDisposable
         "shutdown" => "/shutdown",
         "restart" => "/restart",
         "sleep" => "/sleep",
+        "hibernate" => "/hibernate",
+        "wake" => "/wake",
+        "unlock" => "/unlock",
+        "wol" => "/wol",
         "clean" => "/clean",
         "optimize ram" => "/optimize_ram",
         "cmd" => "/cmd",
@@ -517,6 +726,9 @@ public sealed class TelegramBotService : IDisposable
         "lock" => "/lock",
         "license" => "/license",
         "live" => "/live",
+        "privacy" => "/privacy",
+        "terms" => "/terms",
+        "safety" => "/safety",
         "help" => "/help",
         _ => null
     };
@@ -591,15 +803,37 @@ public sealed class TelegramBotService : IDisposable
             await SendHtml(cid,
                 "<b>Live WebApp access is off.</b>\n\n" +
                 "On the PC open SystemGuard → Telegram tab → <b>Publish live link</b>, " +
-                "then enter the shown address + token in the WebApp <b>Live</b> tab.\n\n" +
-                "Without it the WebApp works in relay mode: commands from the app, replies here in chat.").ConfigureAwait(false);
+                "then enter the shown address + token in the WebApp <b>Status</b> tab.\n\n" +
+                "Without live the WebApp shows a connect card; chat commands (/status, /cmd, …) keep working here.").ConfigureAwait(false);
             return;
         }
         await SendHtml(cid,
             "<b>Live access is ON.</b>\n\n" +
+            $"Transport: <code>{Esc(tunnel.Provider ?? "?")}</code>\n" +
             $"Server: <code>{Esc(url)}</code>\n" +
             $"Token: <code>{Esc(LiveServices.Token)}</code>\n\n" +
-            "Enter both in the WebApp <b>Live</b> tab: live stats, screen, camera and instant controls right inside the app.").ConfigureAwait(false);
+            "Enter both in the WebApp <b>Status</b> tab: full PC mirror right inside the app.\n\n" +
+            "<i>Note: the link changes on every Publish / reconnect — if the app stops connecting, send /live again for a fresh one.</i>").ConfigureAwait(false);
+    }
+
+    // Видео — только внутри WebApp: в чат кидаем ссылку, а не фото-спам.
+    private async Task SendStreamHint(long cid)
+    {
+        var tunnel = LiveServices.Tunnel;
+        var url = tunnel.PublicUrl;
+        if (string.IsNullOrEmpty(url) || !tunnel.IsRunning)
+        {
+            await SendHtml(cid,
+                "<b>Video lives in the Web App</b> (Экран tab, up to 60 FPS, full screen).\n\n" +
+                "Live is currently <b>off</b>: on the PC open SystemGuard → Telegram tab → <b>Publish live link</b>, " +
+                "then enter the address + token in the WebApp Status tab.\n\n" +
+                "Single frames still work here: /screenshot, /cam.").ConfigureAwait(false);
+            return;
+        }
+        await SendHtml(cid,
+            "<b>Video lives in the Web App</b> (Экран tab, up to 60 FPS, full screen).\n\n" +
+            "Open the <b>Web App</b> button below — screen and camera streams play inside the app.\n\n" +
+            "Single frames still work here: /screenshot, /cam.").ConfigureAwait(false);
     }
 
     private static string Bar(double pct, int width = 10)
@@ -628,6 +862,47 @@ public sealed class TelegramBotService : IDisposable
             return b == null ? "No battery (desktop)" : $"Battery: {b.ChargePercent}% ({b.Status})";
         }
         catch (Exception ex) { return Trim(ex.Message, 120); }
+    }
+
+    private static string PerfText()
+    {
+        try
+        {
+            var (totalGb, availGb) = DetailedSystemInfoService.GetPhysicalMemory();
+            var used = Math.Max(0, totalGb - availGb);
+            return $"CPU: {Environment.ProcessorCount} cores\nRAM: {used:F1}/{totalGb:F1} GB\nUptime: {SystemUptime.UptimeText}\n{GetFreeSpace()}\n{GetBatteryLine()}";
+        }
+        catch (Exception ex) { return ex.Message; }
+    }
+
+    private static string SysInfoText()
+    {
+        try
+        {
+            return $"Machine: {Environment.MachineName}\nOS: {Environment.OSVersion}\nUser: {Environment.UserName}\nUptime: {SystemUptime.UptimeText}\n" +
+                   DetailedSystemInfoService.FormatSummary();
+        }
+        catch (Exception ex) { return ex.Message; }
+    }
+
+    private static string StartupText()
+    {
+        try
+        {
+            var items = new StartupService().GetStartupItems();
+            return items.Count == 0 ? "Startup list is empty"
+                : string.Join("\n", items.Select(s => $"{(s.IsEnabled ? "[ON] " : "[OFF]")} {s.Name}"));
+        }
+        catch (Exception ex) { return ex.Message; }
+    }
+
+    private static string PowerPlansText()
+    {
+        try
+        {
+            return string.Join("\n", new PowerService().GetPowerPlans().Select(p => $"{(p.IsActive ? "* " : "  ")}{p.Name}\n  {p.Guid}"));
+        }
+        catch (Exception ex) { return ex.Message; }
     }
 
     private static string GetFreeSpace()
@@ -710,9 +985,12 @@ public sealed class TelegramBotService : IDisposable
         if (!Ready()) return;
         await _botClient!.SendTextMessageAsync(cid,
             $"<b>SystemGuard Remote</b>\n<code>{Esc(Environment.MachineName)}</code>\n\n" +
-            "Pick a button below, open the <b>Web App</b> for the full panel,\n" +
-            "or /live for live in-app screen and camera.\n" +
-            "<i>/help — all commands</i>",
+            "Управляй своим ПК из Telegram: статус, файлы, скриншоты, питание, команды.\n" +
+            "Открой <b>Web App</b> — там полная панель (всё внутри приложения, без закрытия).\n" +
+            "<code>/live</code> — живая ссылка на экран и камеру.\n\n" +
+            "<b>Pro:</b> расширенный пульт, live-доступ и автоматизация — <code>/tariffs</code>.\n" +
+            "Купить Pro: шоп-бот @SystemGuardPayBot. Поддержка: @mattrix_solution.\n" +
+            "<i>/help — все команды • /safety — что нельзя делать</i>",
             parseMode: ParseMode.Html, replyMarkup: MainKeyboard()).ConfigureAwait(false);
     }
 
@@ -740,22 +1018,29 @@ public sealed class TelegramBotService : IDisposable
     }
 
     private async Task SendHelp(long cid) => await SendHtml(cid,
-        "<b>Commands</b>\n\n" +
-        "<code>/status</code> — system card\n" +
-        "<code>/live</code> — live in-app access\n" +
-        "<code>/processes</code> • <code>/apps</code>\n" +
-        "<code>/screenshot</code> • <code>/stream</code> • <code>/stop</code> • <code>/cam</code>\n" +
-        "<code>/ls C:\\</code> • <code>/get C:\\file</code>\n" +
-        "<code>/shutdown</code> • <code>/restart</code> • <code>/cancel</code>\n" +
-        "<code>/sleep</code> • <code>/lock</code>\n" +
-        "<code>/open chrome</code> • <code>/close notepad</code>\n" +
-        "<code>/cmd ipconfig</code>\n" +
-        "<code>/volume 70</code> • <code>/brightness 70</code> • <code>/play /next /prev /mute</code>\n" +
-        "<code>/clean</code> • <code>/ram</code>\n" +
-        "<code>/ip</code> • <code>/ping</code> • <code>/uptime</code>\n" +
-        "<code>/battery</code> • <code>/free</code> • <code>/users</code>\n" +
-        "<code>/license</code>\n\n" +
-        "<i>Arguments work inline, e.g. <code>/ls C:\\Games</code></i>").ConfigureAwait(false);
+        "<b>SystemGuard — справка</b>\n\n" +
+        "<b>Мониторинг</b>\n" +
+        "<code>/status</code> — карточка системы • <code>/perf</code> • <code>/sysinfo</code>\n" +
+        "<code>/ip</code> • <code>/ping</code> • <code>/uptime</code> • <code>/battery</code> • <code>/free</code>\n\n" +
+        "<b>Экран и файлы</b>\n" +
+        "<code>/screenshot</code> • <code>/cam</code> — одиночные кадры в чат\n" +
+        "<code>/stream</code> — видео только в Web App (Экран, до 60 FPS, весь экран)\n" +
+        "<code>/ls C:\\</code> • <code>/get C:\\file</code> • <code>/processes</code> • <code>/apps</code>\n\n" +
+        "<b>Питание и звук</b>\n" +
+        "<code>/shutdown</code> • <code>/restart</code> • <code>/cancel</code> • <code>/sleep</code> • <code>/hibernate</code> • <code>/lock</code>\n" +
+        "<code>/wake</code> • <code>/unlock</code> • <code>/wol AA:BB:CC:DD:EE:FF</code>\n" +
+        "<code>/volume 70</code> • <code>/brightness 70</code> • <code>/play /next /prev /mute</code>\n\n" +
+        "<b>Обслуживание</b>\n" +
+        "<code>/clean</code> • <code>/ram</code> • <code>/open chrome</code> • <code>/close notepad</code> • <code>/cmd ipconfig</code>\n" +
+        "<code>/startup</code> • <code>/netstat</code> • <code>/wifi</code> • <code>/defender</code> • <code>/plans</code> • <code>/eventlog</code> • <code>/remote</code>\n" +
+        "<code>/fan</code> • <code>/fan_mode Silent</code> — вентиляторы\n" +
+        "<code>/hotkey optimize</code> — действия хоткеев\n\n" +
+        "<b>Лицензия</b>\n" +
+        "<code>/tariffs</code> — что входит во Free и Pro, цены\n" +
+        "<code>/buy</code> — купить Pro (Stars и криптоплатежка)\n" +
+        "<code>/license</code> — то же меню покупки\n\n" +
+        "<code>/privacy</code> • <code>/terms</code> • <code>/safety</code> — политики и опасности\n\n" +
+        "<i>Аргументы работают в той же строке: <code>/ls C:\\Games</code>. Опасные команды — только для админов.</i>").ConfigureAwait(false);
 
     private async Task ListDir(long cid, string dir)
     {
@@ -764,6 +1049,12 @@ public sealed class TelegramBotService : IDisposable
             if (string.IsNullOrWhiteSpace(dir))
                 dir = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             dir = dir.Trim().Trim('"');
+            var blockedDir = SelfProtection.BlockedForRemoteRead(dir);
+            if (blockedDir != null)
+            {
+                await SendHtml(cid, Esc(blockedDir) + ".").ConfigureAwait(false);
+                return;
+            }
             if (SelfProtection.IsProtectedPath(dir) && dir.TrimEnd('\\').Equals(SelfProtection.DataDirectory, StringComparison.OrdinalIgnoreCase))
             {
                 await SendHtml(cid, "SystemGuard data folder is hidden.").ConfigureAwait(false);
@@ -795,6 +1086,12 @@ public sealed class TelegramBotService : IDisposable
         try
         {
             path = path.Trim().Trim('"');
+            var blocked = SelfProtection.BlockedForRemoteRead(path);
+            if (blocked != null)
+            {
+                await SendHtml(cid, Esc(blocked)).ConfigureAwait(false);
+                return;
+            }
             if (!File.Exists(path))
             {
                 await SendHtml(cid, "File not found.").ConfigureAwait(false);
@@ -803,7 +1100,9 @@ public sealed class TelegramBotService : IDisposable
             var info = new FileInfo(path);
             if (info.Length > 49L * 1024 * 1024)
             {
-                await SendHtml(cid, "File over 50 MB (Bot API limit).").ConfigureAwait(false);
+                // Жёсткий лимит Bot API. Большие файлы — прямой ссылкой туннеля
+                // из WebApp (Файлы tab, до 500 МБ).
+                await SendHtml(cid, "File over 50 MB (Bot API hard limit).\nOpen <b>Web App → Файлы</b> for the direct tunnel link (up to 500 MB).").ConfigureAwait(false);
                 return;
             }
             await using var s = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
@@ -871,9 +1170,10 @@ public sealed class TelegramBotService : IDisposable
         finally { lock (_streamLock) _streams.Remove(cid); }
     }
 
-    private async Task SendWebcamToChat(long cid)
+    private async Task SendWebcamToChat(long cid, string tag = "")
     {
-        await SendHtml(cid, "<i>Capturing camera…</i>").ConfigureAwait(false);
+        if (string.IsNullOrEmpty(tag))
+            await SendHtml(cid, "<i>Capturing camera…</i>").ConfigureAwait(false);
         var (jpg, err) = await WebcamService.CaptureJpegAsync().ConfigureAwait(false);
         if (jpg == null)
         {
@@ -885,7 +1185,7 @@ public sealed class TelegramBotService : IDisposable
             using var ms = new MemoryStream(jpg);
             await ThrottledSend(cid, (c, ct) =>
                 _botClient!.SendPhotoAsync(c, InputFile.FromStream(ms, "cam.jpg"),
-                    caption: $"Webcam • {DateTime.Now:HH:mm:ss}",
+                    caption: $"Webcam • {DateTime.Now:HH:mm:ss}" + (string.IsNullOrEmpty(tag) ? "" : " " + tag),
                     cancellationToken: ct)).ConfigureAwait(false);
         }
         catch { await SendHtml(cid, "Camera upload failed.").ConfigureAwait(false); }
@@ -909,36 +1209,14 @@ public sealed class TelegramBotService : IDisposable
             string.Join("\n", procs.Select(p => $"• <code>{Esc(p.t)}</code> — {Esc(p.mem)}"))).ConfigureAwait(false);
     }
 
-    private static async Task<string> Exec(string cmd)
-    {
-        try
-        {
-            using var p = new Process
-            {
-                StartInfo = new ProcessStartInfo("cmd.exe", $"/c {cmd}")
-                {
-                    RedirectStandardOutput = true, RedirectStandardError = true,
-                    UseShellExecute = false, CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
-                }
-            };
-            p.Start();
-            var oTask = p.StandardOutput.ReadToEndAsync();
-            var eTask = p.StandardError.ReadToEndAsync();
-            await p.WaitForExitAsync().ConfigureAwait(false);
-            var o = await oTask.ConfigureAwait(false);
-            var e = await eTask.ConfigureAwait(false);
-            return string.IsNullOrEmpty(o) ? e : o;
-        }
-        catch (Exception ex) { return ex.Message; }
-    }
+    // Важно: читаем вывод в OEM-кодировке консоли (CP866 на RU-Windows),
+    // иначе кириллица превращается в кракозябры.
+    private static Task<string> Exec(string cmd) => CmdEncoding.RunAsync(cmd);
 
     private async Task ExecuteAndSend(long cid, string cmd)
     {
         await SendHtml(cid, $"<code>{Esc(Trim(cmd, 200))}</code>\n<i>Running…</i>").ConfigureAwait(false);
-        var r = await Exec(cmd).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(r)) r = "(no output)";
-        if (r.Length > 3800) r = r[..3800] + "\n…(truncated)";
+        var r = CmdEncoding.Clean(await Exec(cmd).ConfigureAwait(false), 3800);
         await SendHtml(cid, $"<code>{Esc(Trim(cmd, 200))}</code>\n<pre>{Esc(r)}</pre>").ConfigureAwait(false);
     }
 
@@ -986,8 +1264,7 @@ public sealed class TelegramBotService : IDisposable
 
     private Task SendMsg(long cid, string msg)
     {
-        var t = string.IsNullOrWhiteSpace(msg) ? "(empty)" : msg.Trim();
-        if (t.Length > 3800) t = t[..3800] + "\n…(truncated)";
+        var t = CmdEncoding.Clean(msg, 3800);
         return SendHtml(cid, "<pre>" + Esc(t) + "</pre>");
     }
 
@@ -1123,7 +1400,10 @@ public sealed class TelegramBotService : IDisposable
         "Half-Year — <b>1000 Stars</b>\n" +
         "Yearly — <b>1800 Stars</b>\n" +
         "Lifetime — <b>3000 Stars</b>\n\n" +
-        "<i>After payment the bot sends an activation key — paste it in the app (License tab).</i>",
+        "Оплата: Stars здесь + криптоплатежка в шоп-боте.\n" +
+        "<i>После оплаты бот пришлёт ключ — вставь его в приложении (Settings → License → «подарочный ключ»). " +
+        "Купленные через шоп-бота ключи привязываются к ПК автоматически.</i>\n\n" +
+        "<i><code>/tariffs</code> — что входит во Free и Pro.</i>",
         parseMode: ParseMode.Html,
         replyMarkup: new InlineKeyboardMarkup(new[]
         {
@@ -1132,6 +1412,32 @@ public sealed class TelegramBotService : IDisposable
             new[] { InlineKeyboardButton.WithCallbackData("Yearly — 1800 Stars", "buy_yearly") },
             new[] { InlineKeyboardButton.WithCallbackData("Lifetime — 3000 Stars", "buy_lifetime") },
         })).ConfigureAwait(false);
+    }
+
+    /// <summary>Красивая справка по тарифам: что за что отвечает.</summary>
+    private async Task SendTariffs(long cid)
+    {
+        if (!Ready()) return;
+        await _botClient!.SendTextMessageAsync(cid,
+        "<b>SystemGuard — тарифы</b>\n\n" +
+        "<b>FREE (навсегда)</b>\n" +
+        "• Мониторинг CPU/GPU/RAM/сети/дисков, история, Free Memory, Flush DNS\n" +
+        "• Процессы: просмотр, Kill, Open Folder\n" +
+        "• Автозагрузка: просмотр, Disable\n" +
+        "• Очистка: Scan, базовая Clean, корзина\n" +
+        "• Питание: Shutdown/Restart/Sleep/Lock, смена плана\n" +
+        "• Defender: Quick Scan, Status\n\n" +
+        "<b>PRO</b>\n" +
+        "• Процессы: Force Kill, дерево, Suspend/Resume, дампы, VirusTotal, приоритеты\n" +
+        "• Службы: Start/Stop • Глубокое удаление программ (3 шага)\n" +
+        "• Игровой режим + твики системы • Бенчмарки и стресс-тесты\n" +
+        "• Сеть: DNS, hosts, сканер портов/Wi-Fi, Wake-on-LAN\n" +
+        "• Шифрование файлов, менеджер паролей\n" +
+        "• Telegram-пульт: скриншоты, файлы, команды, стрим, камера, live-ссылка\n" +
+        "• Планировщик задач\n\n" +
+        "<b>Цены:</b> Monthly 300 • Half-Year 1000 • Yearly 1800 • Lifetime 3000 Stars.\n" +
+        "Купить: <code>/buy</code>. Триал 14 дней — в приложении (Settings → License).",
+        parseMode: ParseMode.Html).ConfigureAwait(false);
     }
 
     private async Task HandleCallback(string? d, long cid)
@@ -1176,11 +1482,36 @@ public sealed class TelegramBotService : IDisposable
             var m = int.Parse(parts[1]);
             var exp = m >= 999 ? DateTime.Now.AddYears(99) : DateTime.Now.AddMonths(m);
             var plan = m >= 999 ? "Lifetime" : planName;
+            var key = GenerateKey("Pro", exp, plan);
             await _botClient!.SendTextMessageAsync(msg.Chat.Id,
-                $"<b>Paid! Thank you!</b>\n\nActivate in the app (License tab):\nKey: <code>{GenerateKey("Pro", exp, plan)}</code>\nValid until {exp:dd MMM yyyy}",
+                $"<b>Paid! Thank you!</b>\n\nActivate in the app (License tab):\nKey: <code>{key}</code>\nValid until {exp:dd MMM yyyy}",
                 parseMode: ParseMode.Html).ConfigureAwait(false);
+            // Stars падают на баланс бота → вывод владельцу через Fragment.
+            // Дублируем чек владельцу, чтобы ни одна оплата не потерялась.
+            try
+            {
+                var uname = msg.From?.Username != null ? "@" + msg.From.Username : $"id {msg.Chat.Id}";
+                await _botClient.SendTextMessageAsync(PoliciesService.StarsOwnerId,
+                    $"<b>Stars payment</b>\nPlan: <code>{Esc(planName)}</code> ({p.TotalAmount} XTR)\nFrom: {Esc(uname)} (chat <code>{msg.Chat.Id}</code>)\nKey: <code>{key}</code>\n<i>Withdraw via BotFather → My Bots → Payments → Fragment.</i>",
+                    parseMode: ParseMode.Html).ConfigureAwait(false);
+            }
+            catch { /* владелец не в чате с ботом — чек уже у плательщика */ }
         }
         catch { }
+    }
+
+    private async Task UnlockWithPassword(long cid, string password)
+    {
+        password = (password ?? "").Trim();
+        if (password.Length == 0)
+        {
+            await SendHtml(cid, "Empty password.").ConfigureAwait(false);
+            return;
+        }
+        await SendHtml(cid, "<i>Waking display and typing password…</i>").ConfigureAwait(false);
+        var res = await RemoteInputService.UnlockAsync(password).ConfigureAwait(false);
+        // Сам пароль нигде не сохраняем и не показываем
+        await SendHtml(cid, Esc(res) + "\n<i>Check screen stream. Delete your password message from chat.</i>").ConfigureAwait(false);
     }
 
     private static string GenerateKey(string tier, DateTime expiry, string plan)
@@ -1195,9 +1526,10 @@ public sealed class TelegramBotService : IDisposable
         return $"SG-PRO-{B64(dataBytes)}.{B64(sig)}";
     }
 
-    private async Task SendScreenshotToChat(long cid)
+    private async Task SendScreenshotToChat(long cid, string tag = "")
     {
-        await SendHtml(cid, "<i>Capturing screen…</i>").ConfigureAwait(false);
+        if (string.IsNullOrEmpty(tag))
+            await SendHtml(cid, "<i>Capturing screen…</i>").ConfigureAwait(false);
         var jpg = await ScreenCaptureService.CaptureScreenJpegAsync().ConfigureAwait(false);
         if (jpg == null)
         {
@@ -1209,7 +1541,7 @@ public sealed class TelegramBotService : IDisposable
             using var ms = new MemoryStream(jpg);
             await ThrottledSend(cid, (c, ct) =>
                 _botClient!.SendPhotoAsync(c, InputFile.FromStream(ms, "ss.jpg"),
-                    caption: $"{Esc(Environment.MachineName)} • {DateTime.Now:HH:mm:ss}",
+                    caption: $"{Esc(Environment.MachineName)} • {DateTime.Now:HH:mm:ss}" + (string.IsNullOrEmpty(tag) ? "" : " " + tag),
                     cancellationToken: ct)).ConfigureAwait(false);
         }
         catch { await SendHtml(cid, "Screenshot upload failed.").ConfigureAwait(false); }
@@ -1238,11 +1570,12 @@ public sealed class TelegramBotService : IDisposable
 
     public bool IsStreaming { get { lock (_streamLock) return _streams.Count > 0; } }
 
+    // Кнопка на ПК больше не спамит фото в чат: шлём подсказку про WebApp.
     public string StartStreamToConfigured()
     {
         if (!IsConfigured || !long.TryParse(_chatId, out var id)) return "Connect bot first";
-        StartScreenStream(id);
-        return "Live stream started";
+        _ = SendStreamHint(id);
+        return "Stream hint sent — video plays in the Web App";
     }
 
     public string StopAllStreams()

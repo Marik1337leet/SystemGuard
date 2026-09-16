@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:controls="using:SystemGuard.Desktop.Controls"
              x:Class="SystemGuard.Desktop.Views.TelegramView"
              x:DataType="vm:TelegramViewModel">
 
@@ -36,7 +37,10 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <!-- Вся вкладка скроллится целиком (лог внутри держит свой фикс. скролл 280).
+         Без этого контент выше вьюпорта обрезался и листать было нечем. -->
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto">
 
         <!-- Configuration -->
         <Panel Grid.Row="0" Margin="0,0,0,12">
@@ -72,14 +76,12 @@
                                  Foreground="{DynamicResource TextBrush}" Padding="16,11" FontFamily="Consolas" FontSize="11"/>
                     </StackPanel>
 
-                    <Grid ColumnDefinitions="*,Auto,Auto,Auto">
-                        <TextBlock Text="{Binding StatusText}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
-                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1"/>
-                        <Button Grid.Column="1" Classes="pill pillGlass" Content="Save"
+                    <Grid ColumnDefinitions="Auto,Auto,Auto">
+                        <Button Grid.Column="0" Classes="pill pillGlass" Content="Save"
                                 Command="{Binding SaveConfigCommand}" Margin="0,0,8,0"/>
-                        <Button Grid.Column="2" Classes="pill pillPrimary" Content="Connect"
+                        <Button Grid.Column="1" Classes="pill pillPrimary" Content="Connect"
                                 Command="{Binding ConnectCommand}" Margin="0,0,8,0"/>
-                        <Button Grid.Column="3" Classes="pill pillGhost" Content="Disconnect"
+                        <Button Grid.Column="2" Classes="pill pillGhost" Content="Disconnect"
                                 Command="{Binding DisconnectCommand}"/>
                     </Grid>
 
@@ -89,7 +91,8 @@
                             <TextBox Text="{Binding NewUserId}" Watermark="Chat ID"
                                      Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
                                      Foreground="{DynamicResource TextBrush}" Padding="16,11" FontFamily="Consolas" FontSize="11" Margin="0,0,8,0"/>
-                            <CheckBox Grid.Column="1" IsChecked="{Binding NewUserAdmin}" Content="Admin" Foreground="{DynamicResource TextBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <CheckBox Grid.Column="1" IsChecked="{Binding NewUserAdmin}" Content="Admin" Foreground="{DynamicResource TextBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"
+                                      IsEnabled="{Binding IsProLicense}" ToolTip.Tip="Pro: admin = full control"/>
                             <Button Grid.Column="2" Classes="pill pillGlass" Content="Add user" Command="{Binding AddUserCommand}"/>
                         </Grid>
                     </StackPanel>
@@ -114,8 +117,11 @@
                     BoxShadow="0 10 30 -8 #59000000" Padding="22">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Text="Live WebApp Access" FontSize="14" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="Live WebApp Access" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                            <controls:LockBadge VerticalAlignment="Center" IsVisible="{Binding !IsProLicense}" />
+                        </StackPanel>
                         <Border Grid.Column="1" CornerRadius="12" Padding="12,7"
                                 Background="#14FFFFFF" BorderBrush="#1FFFFFFF" BorderThickness="1">
                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -138,6 +144,15 @@
                                  Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
                                  Foreground="{DynamicResource TextBrush}" Padding="16,11" FontFamily="Consolas" FontSize="11"/>
                     </Grid>
+                    <Grid ColumnDefinitions="Auto,*">
+                        <TextBlock Text="MAC для WoL:" FontSize="9" Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox Grid.Column="1" Text="{Binding MacAddresses, Mode=OneWay}" IsReadOnly="True"
+                                 Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
+                                 Foreground="{DynamicResource TextBrush}" Padding="16,11" FontFamily="Consolas" FontSize="11"/>
+                    </Grid>
+                    <TextBlock Text="{Binding RemoteHelp}"
+                               FontSize="9" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
                     <Grid ColumnDefinitions="*,*" IsVisible="{Binding IsLiveRunning}">
                         <TextBox Text="{Binding LiveUrl, Mode=OneWay}" IsReadOnly="True"
                                  Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
@@ -148,13 +163,25 @@
                                  Foreground="{DynamicResource TextBrush}" Padding="16,11" FontFamily="Consolas" FontSize="11"
                                  Watermark="Token"/>
                     </Grid>
+                    <!-- Pro-гейт: публикация live-ссылки и токены -->
+                    <Panel IsEnabled="{Binding IsProLicense}">
                     <Grid ColumnDefinitions="*,*">
                         <Button Grid.Column="0" Classes="pill pillPrimary" Content="Publish live link"
                                 Command="{Binding PublishLiveCommand}" Margin="0,0,8,0"/>
                         <Button Grid.Column="1" Classes="pill pillGhost" Content="Stop live"
                                 Command="{Binding StopLiveCommand}"/>
                     </Grid>
-                    <TextBlock Text="Publishes an HTTPS link (Cloudflare Tunnel) to the local remote API. Enter the URL + token in the WebApp Live tab: live stats, screen, camera and instant controls inside the app."
+                    </Panel>
+                    <Panel IsEnabled="{Binding IsProLicense}">
+                    <Grid ColumnDefinitions="*,*">
+                        <Button Grid.Column="0" Classes="pill pillGlass" Content="Новый токен (лечит 401)"
+                                Command="{Binding RegenerateTokenCommand}" Margin="0,0,8,0"/>
+                        <TextBlock Grid.Column="1" Text="После — вставьте новый токен в WebApp"
+                                   FontSize="9" Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    </Grid>
+                    </Panel>
+                    <TextBlock Text="Publishes an HTTPS link (Cloudflare Tunnel) to the local remote API. Enter the URL + token in the WebApp Status tab: full PC mirror inside the app (stats, full-screen up to 60 FPS, camera up to 60 FPS, direct mouse drive on stream, processes, startup, files, terminal, power, WoL, password unlock). WebApp never closes — no sendData."
                                FontSize="9" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
@@ -167,7 +194,10 @@
                     BorderBrush="#1FFFFFFF" BorderThickness="1"
                     BoxShadow="0 8 24 -8 #4D000000" Padding="20" Margin="0,0,0,12">
                 <StackPanel Spacing="12">
-                    <TextBlock Text="Quick Actions" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Text="Quick Actions" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                        <controls:LockBadge VerticalAlignment="Center" IsVisible="{Binding !IsProLicense}" />
+                    </StackPanel>
                     <WrapPanel>
                         <Button Classes="pill pillGlass" Command="{Binding SendStatusCommand}"
                                 IsEnabled="{Binding IsConnected}" Margin="0,0,8,8">
@@ -176,15 +206,20 @@
                                 <TextBlock Text="Send Status"/>
                             </StackPanel>
                         </Button>
+                        <!-- Pro-гейт: скриншот (у кнопки уже есть IsConnected — гейт на обёртке) -->
+                        <Panel IsEnabled="{Binding IsProLicense}" Margin="0,0,8,8">
                         <Button Classes="pill pillGlass" Command="{Binding SendScreenshotCommand}"
-                                IsEnabled="{Binding IsConnected}" Margin="0,0,8,8">
+                                IsEnabled="{Binding IsConnected}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Path Data="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" Fill="{DynamicResource AccentBrush}" Width="14" Height="14" Stretch="Uniform"/>
                                 <TextBlock Text="Screenshot"/>
                             </StackPanel>
                         </Button>
+                        </Panel>
                     </WrapPanel>
 
+                    <!-- Pro-гейт: удалённая консоль -->
+                    <Panel IsEnabled="{Binding IsProLicense}">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBox Text="{Binding CommandInput}" Watermark="Type CMD command…"
                                  Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
@@ -193,6 +228,9 @@
                         <Button Grid.Column="1" Classes="pill pillPrimary" Content="Execute"
                                 Command="{Binding ExecuteCmdCommand}"/>
                     </Grid>
+                    </Panel>
+                    <!-- Pro-гейт: отправка файлов -->
+                    <Panel IsEnabled="{Binding IsProLicense}">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBox Text="{Binding FilePathInput}" Watermark="PC file path to send…"
                                  Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
@@ -202,6 +240,9 @@
                                 Command="{Binding SendFileCommand}"
                                 IsEnabled="{Binding IsConnected}"/>
                     </Grid>
+                    </Panel>
+                    <!-- Pro-гейт: стрим и камера -->
+                    <Panel IsEnabled="{Binding IsProLicense}">
                     <WrapPanel>
                         <Button Classes="pill pillGlass" Content="Start stream"
                                 Command="{Binding StartStreamCommand}"
@@ -212,8 +253,9 @@
                                 Command="{Binding SendCamCommand}"
                                 IsEnabled="{Binding IsConnected}" Margin="0,0,8,8"/>
                     </WrapPanel>
-                    <TextBlock Text="/stream · /stop · /cam · /ls · /get — right in the chat"
-                               FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
+                    </Panel>
+                    <TextBlock Text="Video plays in Web App → Экран. /screenshot · /cam · /ls · /get — right in the chat"
+                               FontSize="9" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -243,4 +285,5 @@
         </Grid>
 
     </Grid>
+    </ScrollViewer>
 </UserControl>

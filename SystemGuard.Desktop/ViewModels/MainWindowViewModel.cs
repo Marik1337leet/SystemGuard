@@ -1,5 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
@@ -18,7 +20,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private StartupViewModel? _startupVM;
     private SettingsViewModel? _settingsVM;
     private TelegramViewModel? _telegramVM;
-    private SchedulerViewModel? _schedulerVM;
     private NetworkViewModel? _networkVM;
     private LicenseViewModel? _licenseVM;
     private ColorPickerViewModel? _colorPickerVM;
@@ -39,8 +40,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public string AppVersion { get; } = GetAppVersion();
 
+    /// <summary>
+    /// Кнопка-бейдж слева снизу: Free → ведёт на покупку (Settings/License),
+    /// Pro/Enterprise → тоже открывает License (продление, чек, деактивация).
+    /// Текст бейджа всегда отражает текущий тариф (Free / Pro / Pro Trial / Enterprise).
+    /// </summary>
+    public IRelayCommand NavigateToLicenseCommand { get; }
+
     public MainWindowViewModel()
     {
+        NavigateToLicenseCommand = new RelayCommand(() => NavigateToLicense());
+        // Мгновенная реакция на активацию/истечение: бейдж + гейты текущего
+        // экрана (включая вложенные VM настроек через каскад Settings).
+        LicenseGate.Changed += OnLicenseChanged;
         InitializeMenu();
         LocalizationService.Instance.LanguageChanged += _ => ApplyMenuLanguage();
         // Применяем сохранённый язык при старте (раньше настройка ни на что не влияла)
@@ -50,6 +62,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         NavigateTo("dashboard");
         StartWebSocket();
         StartLiveServer();
+        StartHotkeys();
         OverlayManager.RestoreAtStartup();
     }
 
@@ -86,11 +99,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void RefreshLicenseInfo()
     {
         var lic = _licenseService.CurrentLicense;
-        IsProLicense = lic.IsValid && lic.Tier != "Free" && !lic.IsExpired;
+        IsProLicense = LicenseGate.IsPro(lic);
 
         if (lic.IsValid && !lic.IsExpired)
         {
-            LicenseInfo = lic.Tier;
+            LicenseInfo = lic.Tier == "Free" && LicenseGate.IsTrial(lic) ? "Pro Trial" : lic.Tier;
             LicenseDaysLeft = lic.Tier == "Free"
                 ? $"{lic.DaysLeft} days trial"
                 : $"{lic.DaysLeft} days left";
@@ -103,6 +116,40 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             LicenseDaysLeft = "Upgrade to Pro";
             LicenseBadgeChar = "F";
         }
+    }
+
+    /// <summary>Открыть экран покупки/управления лицензией.</summary>
+    public void NavigateToLicense()
+    {
+        NavigateTo("settings");
+        // Settings создаётся лениво внутри NavigateTo — забираем и переключаем таб.
+        if (_settingsVM != null)
+            _settingsVM.SelectLicenseTab();
+        RefreshLicenseInfo();
+    }
+
+    private void OnLicenseChanged()
+    {
+        try
+        {
+            // Событие может прийти с фона: свойства — только через UI-поток.
+            if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+                ApplyLicenseChanged();
+            else
+                Avalonia.Threading.Dispatcher.UIThread.Post(ApplyLicenseChanged);
+        }
+        catch { }
+    }
+
+    private void ApplyLicenseChanged()
+    {
+        try
+        {
+            RefreshLicenseInfo();
+            if (CurrentView is ViewModelBase vm)
+                vm.RefreshLicenseGate(); // у Settings — каскад во вложенные VM
+        }
+        catch { }
     }
 
     // ── WebSocket ─────────────────────────────────────────────────────────────
@@ -118,6 +165,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         try { LiveServices.StartServer(); }
         catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[Live] {ex.Message}"); }
+    }
+
+    // Глобальные хоткеи: только бинды пользователя (стандартных больше нет —
+    // пустой список = хук висит, но ничего не перехватывает).
+    private void StartHotkeys()
+    {
+        try
+        {
+            var saved = new SettingsService().Load().Hotkeys ?? new List<Models.HotkeyBinding>();
+            GlobalHotkeyService.Instance.Start(saved);
+        }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[Hotkeys] {ex.Message}"); }
     }
 
     // ── Menu ──────────────────────────────────────────────────────────────────
@@ -195,9 +254,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             "network" => _networkVM ??= new NetworkViewModel(),
             "security" => _securityVM ??= new SecurityViewModel(),
             "settings" => _settingsVM ??= new SettingsViewModel(),
-            // Совместимость
-            "telegram" => _telegramVM ??= new TelegramViewModel(),
-            "scheduler" => _schedulerVM ??= new SchedulerViewModel(),
+                // Совместимость (старые диплинки): scheduler удалён → ведём в настройки
+                "telegram" => _telegramVM ??= new TelegramViewModel(),
+                "scheduler" => _settingsVM ??= new SettingsViewModel(),
             "license" => _licenseVM ??= new LicenseViewModel(),
             "colors" => _colorPickerVM ??= new ColorPickerViewModel(),
             "appearance" => _appearanceVM ??= new AppearancePacksViewModel(),
@@ -206,12 +265,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         CurrentView = next;
         next.OnActivated();
+        // Pro-гейт: свежий тариф на каждый заход (истёкшая подписка
+        // закрывает функции сразу, без перезапуска приложения).
+        try { next.RefreshLicenseGate(); } catch { }
+        // Бейдж слева снизу тоже обновляем — Free/Pro видно всегда.
+        try { RefreshLicenseInfo(); } catch { }
 
         // Прокидываем окно в VM которым нужен файловый диалог
         if (next is GameModeViewModel gm && _ownerWindow != null)
             gm.OwnerWindow = _ownerWindow;
         if (next is SettingsViewModel sv && _ownerWindow != null)
             sv.OwnerWindow = _ownerWindow;
+        if (next is DashboardViewModel db && _ownerWindow != null)
+            db.OwnerWindow = _ownerWindow;
     }
 
     // ── Owner window ref (для файловых диалогов) ─────────────────────────────
@@ -221,6 +287,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public void SetOwnerWindow(Avalonia.Controls.Window window)
     {
         _ownerWindow = window;
+        try { if (_dashboardVM != null) _dashboardVM.OwnerWindow = window; } catch { }
+        try { if (_settingsVM != null) _settingsVM.OwnerWindow = window; } catch { }
     }
 
     // ── Version ───────────────────────────────────────────────────────────────

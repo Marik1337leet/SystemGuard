@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:controls="using:SystemGuard.Desktop.Controls"
              xmlns:services="using:SystemGuard.Desktop.Services"
              x:Class="SystemGuard.Desktop.Views.NetworkView"
              x:DataType="vm:NetworkViewModel">
@@ -59,10 +60,10 @@
                     BoxShadow="0 8 24 -8 #4D000000" Padding="18">
                 <StackPanel Spacing="12">
                     <Grid ColumnDefinitions="*,Auto">
-                        <Border Width="536" Height="44" CornerRadius="22" Background="{DynamicResource CardBrush}"
+                        <Border Width="404" Height="44" CornerRadius="22" Background="{DynamicResource CardBrush}"
                                 BorderBrush="#1FFFFFFF" BorderThickness="1" ClipToBounds="True" Padding="4"
                                 HorizontalAlignment="Left">
-                            <Panel Width="528" Height="36" ClipToBounds="True">
+                            <Panel Width="396" Height="36" ClipToBounds="True">
                                 <Border x:Name="TabIndicator" Width="132" Height="36" CornerRadius="18"
                                         Background="{DynamicResource AccentBrush}"
                                         HorizontalAlignment="Left" VerticalAlignment="Center">
@@ -77,11 +78,6 @@
                                         <TextBlock Text="Adapters" FontSize="11.5" FontWeight="SemiBold"
                                                    TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
                                                    Foreground="{Binding IsAdaptersTab, Converter={StaticResource BoolToForegroundConverter}}"/>
-                                    </Button>
-                                    <Button Width="132" Height="36" Classes="segment" Click="TrafficTab_Click">
-                                        <TextBlock Text="Traffic" FontSize="11.5" FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis" TextAlignment="Center" MaxWidth="116" MaxLines="1"
-                                                   Foreground="{Binding IsTrafficTab, Converter={StaticResource BoolToForegroundConverter}}"/>
                                     </Button>
                                     <Button Width="132" Height="36" Classes="segment" Click="FirewallTab_Click">
                                         <TextBlock Text="Firewall" FontSize="11.5" FontWeight="SemiBold"
@@ -98,29 +94,37 @@
                         </Border>
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <Button Classes="pill pillGlass" Content="Speed Test" Command="{Binding TestSpeedCommand}"
-                                    IsEnabled="{Binding !IsTestingSpeed}"/>
+                            <!-- Pro-гейт: Speed Test (у кнопки уже есть !IsTestingSpeed — гейт вешаем на обёртку) -->
+                            <Panel IsEnabled="{Binding IsProLicense}">
+                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <Button Classes="pill pillGlass" Content="Speed Test" Command="{Binding TestSpeedCommand}"
+                                            IsEnabled="{Binding !IsTestingSpeed}"/>
+                                    <controls:LockBadge VerticalAlignment="Center" IsVisible="{Binding !IsProLicense}" />
+                                </StackPanel>
+                            </Panel>
                             <Button Classes="pill pillGhost" Content="Flush DNS" Command="{Binding FlushDnsCommand}"/>
-                            <Button Classes="pill pillGhost" Content="Reset" Command="{Binding ResetNetworkCommand}"/>
+                            <Button Classes="pill pillGhost" Content="Reset" Command="{Binding ResetNetworkCommand}"
+                                    IsEnabled="{Binding IsProLicense}"
+                                    ToolTip.Tip="Pro: сброс сетевого стека"/>
                             <Button Classes="pill pillGhost" Content="Ping" Command="{Binding TestLatencyCommand}"/>
                         </StackPanel>
                     </Grid>
 
-                    <Grid ColumnDefinitions="*,Auto,Auto,Auto">
-                        <TextBlock Text="{Binding StatusText}" FontSize="10"
-                                   Foreground="{DynamicResource TextMutedBrush}"
-                                   TextTrimming="CharacterEllipsis" MaxLines="1"/>
-                        <TextBlock Grid.Column="1" Text="{Binding SpeedTestResult}" FontSize="10"
-                                   Foreground="{DynamicResource AccentBrush}" Margin="0,0,16,0"
+                    <Grid ColumnDefinitions="Auto,Auto,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding SpeedTestResult}" FontSize="10"
+                                   Foreground="{DynamicResource AccentBrush}" Margin="0,0,16,0" VerticalAlignment="Center"
                                    IsVisible="{Binding SpeedTestResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                        <TextBlock Grid.Column="2"
+                        <TextBlock Grid.Column="1"
                                    Text="{Binding ExternalIp, StringFormat='WAN: {0}'}"
                                    FontSize="10" Foreground="{DynamicResource AccentLightBrush}"
                                    Margin="0,0,16,0" MaxLines="1"/>
-                        <TextBlock Grid.Column="3"
+                        <TextBlock Grid.Column="2"
                                    Text="{Binding LatencyText}"
                                    FontSize="10" Foreground="{DynamicResource AccentBrush}" MaxLines="1"/>
                     </Grid>
+                    <ProgressBar Value="{Binding SpeedTestProgress}" Minimum="0" Maximum="100" Height="4" CornerRadius="2"
+                                 Foreground="{DynamicResource AccentBrush}" Background="#14FFFFFF"
+                                 IsVisible="{Binding IsTestingSpeed}"/>
                 </StackPanel>
             </Border>
             <Border CornerRadius="22" IsHitTestVisible="False">
@@ -190,64 +194,6 @@
                 </ItemsControl>
             </ScrollViewer>
 
-            <!-- Traffic -->
-            <Panel IsVisible="{Binding IsTrafficTab}">
-                <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
-                        BorderBrush="#1FFFFFFF" BorderThickness="1"
-                        BoxShadow="0 10 30 -8 #59000000" Padding="22">
-                    <StackPanel Spacing="16">
-                        <TextBlock Text="Live Traffic" FontSize="14" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextBrush}"/>
-                        <Grid ColumnDefinitions="*,*">
-                            <Border Background="#14FFFFFF" CornerRadius="18"
-                                    Padding="20" Margin="0,0,6,0"
-                                    BorderBrush="#1FFFFFFF" BorderThickness="1">
-                                <StackPanel Spacing="8">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <Path Data="M12 4v12m0 0l-5-5m5 5l5-5" Stroke="{DynamicResource TextMutedBrush}"
-                                              StrokeThickness="2" Width="10" Height="10" Stretch="Uniform"/>
-                                        <TextBlock Text="DOWNLOAD" FontSize="9"
-                                                   Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
-                                    </StackPanel>
-                                    <TextBlock Text="{Binding Traffic.DownloadMbps, StringFormat='{}{0:F2}'}"
-                                               FontSize="32" FontWeight="Black"
-                                               Foreground="{DynamicResource AccentLightBrush}"/>
-                                    <TextBlock Text="Mbps" FontSize="11" Foreground="{DynamicResource TextMutedBrush}"/>
-                                    <TextBlock Text="{Binding Traffic.TotalDownloaded, Converter={StaticResource BytesToMBConverter}, StringFormat='Total: {0}'}"
-                                               FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="1" Background="#14FFFFFF"
-                                    CornerRadius="18" Padding="20" Margin="6,0,0,0"
-                                    BorderBrush="#1FFFFFFF" BorderThickness="1">
-                                <StackPanel Spacing="8">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <Path Data="M12 20V8m0 0l-5 5m5-5l5 5" Stroke="{DynamicResource TextMutedBrush}"
-                                              StrokeThickness="2" Width="10" Height="10" Stretch="Uniform"/>
-                                        <TextBlock Text="UPLOAD" FontSize="9"
-                                                   Foreground="{DynamicResource TextMutedBrush}" LetterSpacing="1"/>
-                                    </StackPanel>
-                                    <TextBlock Text="{Binding Traffic.UploadMbps, StringFormat='{}{0:F2}'}"
-                                               FontSize="32" FontWeight="Black"
-                                               Foreground="{DynamicResource AccentBrush}"/>
-                                    <TextBlock Text="Mbps" FontSize="11" Foreground="{DynamicResource TextMutedBrush}"/>
-                                    <TextBlock Text="{Binding Traffic.TotalUploaded, Converter={StaticResource BytesToMBConverter}, StringFormat='Total: {0}'}"
-                                               FontSize="9" Foreground="{DynamicResource TextMutedBrush}"/>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-                <Border CornerRadius="24" IsHitTestVisible="False">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,40%">
-                            <GradientStop Color="#1FFFFFFF" Offset="0"/>
-                            <GradientStop Color="#00FFFFFF" Offset="1"/>
-                        </LinearGradientBrush>
-                    </Border.Background>
-                </Border>
-            </Panel>
-
             <!-- Firewall -->
             <ScrollViewer IsVisible="{Binding IsFirewallTab}">
                 <StackPanel Spacing="8">
@@ -306,9 +252,18 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- Tools: DNS / hosts / ports -->
+            <!-- Tools: DNS / hosts / ports — целиком Pro -->
             <ScrollViewer IsVisible="{Binding IsToolsTab}">
-                <StackPanel Spacing="12">
+                <StackPanel Spacing="12" IsEnabled="{Binding IsProLicense}">
+                    <Border Background="#33C96C9E" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="18" Padding="14,12"
+                            IsVisible="{Binding !IsProLicense}">
+                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <controls:LockBadge VerticalAlignment="Center" />
+                            <TextBlock Text="PRO-инструменты: DNS, hosts, сканеры и WoL — с Pro-лицензией (кнопка слева снизу)."
+                                       FontSize="11" Foreground="{DynamicResource TextBrush}"
+                                       VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
                     <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1" CornerRadius="20" Padding="20">
                         <StackPanel Spacing="10">
                             <TextBlock Text="DNS Switch" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
@@ -371,7 +326,7 @@
                     </Border>
                     <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1" CornerRadius="20" Padding="20">
                         <StackPanel Spacing="10">
-                            <TextBlock Text="Traffic &amp; Wake-on-LAN" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="Month usage &amp; Wake-on-LAN" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
                             <TextBlock Text="{Binding MonthTrafficText}" FontSize="11" Foreground="{DynamicResource AccentLightBrush}"/>
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Text="{Binding WolMac}" Watermark="MAC for WoL, e.g. AA:BB:CC:DD:EE:FF"

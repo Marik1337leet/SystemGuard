@@ -2,4 +2,7 @@
   <Project Path="SystemGuard.Core/SystemGuard.Core.csproj" />
   <Project Path="SystemGuard.Desktop/SystemGuard.Desktop.csproj" />
   <Project Path="SystemGuard.KeyGenerator/SystemGuard.KeyGenerator.csproj" Id="e6ebd9f4-2352-4297-a017-f26a0831a17d" />
+  <Project Path="SystemGuard.Tests/SystemGuard.Tests.csproj" />
+  <Project Path="SystemGuard.ShopBot/SystemGuard.ShopBot.csproj" />
+  <Project Path="SystemGuard.LogoGen/SystemGuard.LogoGen.csproj" />
 </Solution>

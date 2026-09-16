@@ -11,7 +11,7 @@ namespace SystemGuard.Desktop.Services;
 
 // ── НАТИВНАЯ кастомизация Windows (без SkinPack/Rainmeter/доков) ────────────
 // Всё — средствами самой Windows: HKCU-реестр, SystemParametersInfo,
-// звуковые схемы, курсоры, обои. Никаких патчей system32.
+// курсоры, обои. Никаких патчей system32.
 // Каждое изменение пишется через WriteDword/WriteString с бэкапом значения,
 // откат — RestoreDefaults(). Опасного (HKLM, system32) здесь нет по дизайну.
 public class AppearancePacksService
@@ -22,7 +22,6 @@ public class AppearancePacksService
     private const string CursorsKey = @"Control Panel\Cursors";
     private const string MouseKey = @"Control Panel\Mouse";
     private const string EaseCursorKey = @"Software\Microsoft\Accessibility";
-    private const string SoundsKey = @"AppEvents\Schemes";
     private const string MetricsKey = @"Control Panel\Desktop\WindowMetrics";
     private const string HideDesktopKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel";
 
@@ -348,53 +347,6 @@ public class AppearancePacksService
         }
         catch { }
     }
-
-    // ═══ SOUNDS ═══
-
-    public List<string> GetSoundSchemes()
-    {
-        var list = new List<string> { ".Default", ".None" };
-        try
-        {
-            using var k = Registry.CurrentUser.OpenSubKey(SoundsKey);
-            if (k != null)
-                foreach (var n in k.GetSubKeyNames())
-                    if (!list.Contains(n) && !n.StartsWith(".")) list.Add(n);
-        }
-        catch { }
-        return list;
-    }
-
-    public string CurrentSoundScheme()
-    {
-        try
-        {
-            using var k = Registry.CurrentUser.OpenSubKey(SoundsKey);
-            return k?.GetValue("")?.ToString() is string s && !string.IsNullOrEmpty(s) ? s : ".Default";
-        }
-        catch { return ".Default"; }
-    }
-
-    public bool ApplySoundScheme(string scheme)
-    {
-        try
-        {
-            using var k = Registry.CurrentUser.CreateSubKey(SoundsKey);
-            if (k == null) return false;
-            BackupValue(SoundsKey, "");
-            k.SetValue("", scheme);
-            BroadcastSettingChange();
-            return true;
-        }
-        catch { return false; }
-    }
-
-    public string SoundDisplayName(string scheme) => scheme switch
-    {
-        ".Default" => "Windows Default",
-        ".None" => "No Sounds",
-        _ => scheme
-    };
 
     // ═══ EXPLORER ═══
 

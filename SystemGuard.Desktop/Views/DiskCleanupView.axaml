@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:controls="using:SystemGuard.Desktop.Controls"
              xmlns:services="using:SystemGuard.Desktop.Services"
              x:Class="SystemGuard.Desktop.Views.DiskCleanupView"
              x:DataType="vm:DiskCleanupViewModel">
@@ -64,8 +65,6 @@
             <!-- ══════ Header ══════ -->
             <StackPanel Spacing="2" Margin="0,0,0,18">
                 <TextBlock Text="Storage Cleanup" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
-                <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource TextMutedBrush}"
-                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
             </StackPanel>
 
             <!-- ══════ Hero glass card ══════ -->
@@ -202,8 +201,17 @@
                            IsVisible="{Binding !HasCleanupItems}"/>
             </StackPanel>
 
-            <!-- ══════ TOOLS TAB ══════ -->
-            <StackPanel Spacing="12" IsVisible="{Binding IsToolsTab}">
+            <!-- ══════ TOOLS TAB — целиком Pro ══════ -->
+            <StackPanel Spacing="12" IsVisible="{Binding IsToolsTab}" IsEnabled="{Binding IsProLicense}">
+                <Border Background="#33C96C9E" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="18" Padding="14,12"
+                        IsVisible="{Binding !IsProLicense}">
+                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <controls:LockBadge VerticalAlignment="Center" />
+                        <TextBlock Text="PRO-инструменты: анализ, дубликаты, шейдеры и бэкапы — с Pro-лицензией."
+                                   FontSize="11" Foreground="{DynamicResource TextBrush}"
+                                   VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
                 <WrapPanel>
                     <Button Classes="pill pillGlass" Content="Analyze Folders" Command="{Binding AnalyzeFolderCommand}"
                             IsEnabled="{Binding !IsScanning}" Margin="0,0,10,10"/>
@@ -379,11 +387,26 @@
             <!-- ══════ PRIVACY TAB ══════ -->
             <StackPanel Spacing="12" IsVisible="{Binding IsPrivacyTab}">
                 <WrapPanel>
+                    <Button Classes="pill pillPrimary" Content="Scan" Command="{Binding ScanCleanupCommand}"
+                            IsEnabled="{Binding !IsScanning}" Margin="0,0,10,10"/>
                     <Button Classes="pill pillGlass" Content="Select All" Command="{Binding SelectAllPrivacyCommand}" Margin="0,0,10,10"/>
                     <Button Classes="pill pillGhost" Content="Deselect All" Command="{Binding DeselectAllPrivacyCommand}" Margin="0,0,10,10"/>
-                    <Button Classes="pill pillPrimary" Content="Clean Selected" Command="{Binding CleanCommand}"
-                            IsEnabled="{Binding !IsCleaning}" Margin="0,0,10,10"/>
+                    <!-- Pro-гейт: чистка приватности (у кнопки уже есть !IsCleaning — гейт на обёртке) -->
+                    <Panel IsEnabled="{Binding IsProLicense}" Margin="0,0,10,10">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Button Classes="pill pillPrimary" Content="Clean Selected" Command="{Binding CleanCommand}"
+                                    IsEnabled="{Binding !IsCleaning}"/>
+                            <controls:LockBadge VerticalAlignment="Center" IsVisible="{Binding !IsProLicense}" />
+                        </StackPanel>
+                    </Panel>
                 </WrapPanel>
+
+                <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="4" CornerRadius="2"
+                             Foreground="{DynamicResource AccentBrush}" Background="#14FFFFFF"
+                             IsVisible="{Binding IsScanning}"/>
+
+                <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold"
+                           Foreground="{DynamicResource AccentLightBrush}" TextWrapping="Wrap" MaxLines="2"/>
 
                 <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
                         BorderBrush="#1FFFFFFF" BorderThickness="1" BoxShadow="0 8 24 -8 #4D000000" Padding="6"
@@ -466,12 +489,29 @@
                         </Border.Background>
                     </Border>
                 </Panel>
+                <!-- Pro-гейт: поиск остатков (у кнопок уже есть !IsScanning — гейт на обёртке) -->
+                <Border Background="#33C96C9E" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="18" Padding="14,12"
+                        IsVisible="{Binding !IsProLicense}">
+                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <controls:LockBadge VerticalAlignment="Center" />
+                        <TextBlock Text="PRO-инструменты: поиск дубликатов и больших файлов — с Pro-лицензией."
+                                   FontSize="11" Foreground="{DynamicResource TextBrush}"
+                                   VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                <Panel IsEnabled="{Binding IsProLicense}">
                 <WrapPanel>
                     <Button Classes="pill pillGlass" Content="Find Duplicates" Command="{Binding FindDuplicatesCommand}"
                             IsEnabled="{Binding !IsScanning}" Margin="0,0,10,10"/>
                     <Button Classes="pill pillGlass" Content="Find Large Files" Command="{Binding FindLargeFilesCommand}"
                             IsEnabled="{Binding !IsScanning}" Margin="0,0,10,10"/>
                 </WrapPanel>
+                </Panel>
+                <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="4" CornerRadius="2"
+                             Foreground="{DynamicResource AccentBrush}" Background="#14FFFFFF"
+                             IsVisible="{Binding IsScanning}"/>
+                <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold"
+                           Foreground="{DynamicResource AccentLightBrush}" TextWrapping="Wrap" MaxLines="2"/>
             </StackPanel>
 
         </StackPanel>

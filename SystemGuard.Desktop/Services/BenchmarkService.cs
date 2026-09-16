@@ -262,10 +262,10 @@ public class BenchmarkService
                 TestName = "Network Download",
                 Score = 0,
                 Unit = "Mbps",
-                Details = "Test failed - check internet connection",
+                Details = "Test skipped — speed server unreachable (firewall/VPN?)",
                 PercentageVsReference = 0,
-                Rating = "Failed",
-                Recommendation = "No internet connection detected"
+                Rating = "Skipped",
+                Recommendation = "Speed test unavailable — not an internet problem, check firewall/VPN and retry"
             };
         }
     });

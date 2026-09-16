@@ -145,17 +145,17 @@ public partial class DiskCleanupViewModel : ViewModelBase
 
     private async Task ScanCleanup()
     {
+        if (IsScanning) return;
         IsScanning = true; StatusText = "Scanning..."; Progress = 0;
-        await Task.Run(() =>
+        try
         {
-            var items = _cleanupService.GetCleanupItems();
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                CleanupItems = new ObservableCollection<CleanupItem>(items);
-                IsScanning = false; Progress = 100;
-                StatusText = $"Found {items.Count} items";
-            });
-        });
+            var items = await Task.Run(() => _cleanupService.GetCleanupItems());
+            CleanupItems = new ObservableCollection<CleanupItem>(items);
+            Progress = 100;
+            StatusText = items.Count > 0 ? $"Found {items.Count} items" : "Nothing to clean";
+        }
+        catch (Exception ex) { StatusText = $"Scan failed: {ex.Message}"; }
+        finally { IsScanning = false; }
     }
 
     private async Task Clean()
@@ -187,60 +187,85 @@ public partial class DiskCleanupViewModel : ViewModelBase
 
     private async Task AnalyzeFolders()
     {
+        if (IsScanning) return;
         IsScanning = true;
-        LargeFolders = new ObservableCollection<FolderSizeInfo>(await _diskService.AnalyzeFolderSizes("C:\\"));
-        IsScanning = false;
-        StatusText = $"{LargeFolders.Count} folders";
+        StatusText = "Analyzing folders…";
+        try
+        {
+            LargeFolders = new ObservableCollection<FolderSizeInfo>(await _diskService.AnalyzeFolderSizes("C:\\"));
+            StatusText = $"{LargeFolders.Count} folders";
+        }
+        catch (Exception ex) { StatusText = $"Analyze failed: {ex.Message}"; }
+        finally { IsScanning = false; }
     }
 
     private async Task ScanLargeFiles()
     {
+        if (IsScanning) return;
         IsScanning = true;
-        LargeFiles = new ObservableCollection<LargeFileInfo>(await _diskService.FindLargeFiles("C:\\"));
-        IsScanning = false;
-        StatusText = $"{LargeFiles.Count} files";
+        StatusText = "Searching large files on C:\\ …";
+        try
+        {
+            LargeFiles = new ObservableCollection<LargeFileInfo>(await _diskService.FindLargeFiles("C:\\"));
+            StatusText = LargeFiles.Count > 0 ? $"{LargeFiles.Count} large files" : "No large files found on C:\\";
+        }
+        catch (Exception ex) { StatusText = $"Search failed: {ex.Message}"; }
+        finally { IsScanning = false; }
     }
 
     private async Task ScanDuplicates()
     {
+        if (IsScanning) return;
         IsScanning = true;
-        Duplicates = new ObservableCollection<DuplicateFileGroup>(await _diskService.FindDuplicates("C:\\"));
-        IsScanning = false;
-        StatusText = $"{Duplicates.Count} groups";
+        StatusText = "Searching duplicates on C:\\ (may take a while)…";
+        try
+        {
+            Duplicates = new ObservableCollection<DuplicateFileGroup>(await _diskService.FindDuplicates("C:\\"));
+            StatusText = Duplicates.Count > 0
+                ? $"{Duplicates.Count} duplicate groups, waste {TotalDuplicateWaste / 1048576} MB"
+                : "No duplicates found on C:\\";
+        }
+        catch (Exception ex) { StatusText = $"Search failed: {ex.Message}"; }
+        finally { IsScanning = false; }
     }
 
     // Старые файлы: не использовались N дней (реальный поиск по LastAccessTime)
     private async Task ScanOldFiles()
     {
+        if (IsScanning) return;
         IsScanning = true;
         StatusText = $"Searching files older than {OldFileDays} days…";
         var days = Math.Clamp(OldFileDays, 1, 3650);
         var cutoff = DateTime.Now.AddDays(-days);
-        var found = await Task.Run(() =>
+        try
         {
-            var list = new List<LargeFileInfo>();
-            try
+            var found = await Task.Run(() =>
             {
-                var root = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Take(20000))
+                var list = new List<LargeFileInfo>();
+                try
                 {
-                    try
+                    var root = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Take(20000))
                     {
-                        var fi = new FileInfo(file);
-                        if (fi.LastAccessTime < cutoff && fi.Length > 1024 * 1024)
-                            list.Add(new LargeFileInfo { Name = fi.Name, Path = fi.FullName, Size = fi.Length });
-                        if (list.Count >= 200) break;
+                        try
+                        {
+                            var fi = new FileInfo(file);
+                            if (fi.LastAccessTime < cutoff && fi.Length > 1024 * 1024)
+                                list.Add(new LargeFileInfo { Name = fi.Name, Path = fi.FullName, Size = fi.Length });
+                            if (list.Count >= 200) break;
+                        }
+                        catch { }
                     }
-                    catch { }
                 }
-            }
-            catch { }
-            return list.OrderByDescending(f => f.Size).ToList();
-        });
-        OldFiles = new ObservableCollection<LargeFileInfo>(found);
-        OnPropertyChanged(nameof(HasOldFiles));
-        IsScanning = false;
-        StatusText = $"{found.Count} old files (>{days}d, capped at 200)";
+                catch { }
+                return list.OrderByDescending(f => f.Size).ToList();
+            });
+            OldFiles = new ObservableCollection<LargeFileInfo>(found);
+            OnPropertyChanged(nameof(HasOldFiles));
+            StatusText = $"{found.Count} old files (>{days}d, capped at 200)";
+        }
+        catch (Exception ex) { StatusText = $"Search failed: {ex.Message}"; }
+        finally { IsScanning = false; }
     }
 
     private void SetAllSelected(bool s)

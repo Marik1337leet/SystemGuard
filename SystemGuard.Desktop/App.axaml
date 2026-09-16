@@ -97,9 +97,49 @@
         <DataTemplate DataType="vm:SecurityViewModel">
             <views:SecurityView/>
         </DataTemplate>
+        <DataTemplate DataType="vm:HotkeysViewModel">
+            <views:HotkeysView/>
+        </DataTemplate>
+        <DataTemplate DataType="vm:FansViewModel">
+            <views:FansView/>
+        </DataTemplate>
     </Application.DataTemplates>
 
     <Application.Styles>
         <FluentTheme/>
+        <!-- iOS 26 style: переключатели и ползунки как в технике Apple -->
+        <Style Selector="ToggleSwitch">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+        </Style>
+        <Style Selector="ToggleSwitch /template/ Border#SwitchKnob">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BoxShadow" Value="0 2 6 0 #40000000"/>
+        </Style>
+        <Style Selector="ToggleSwitch:checked /template/ Border#SwitchArea">
+            <Setter Property="Background" Value="#34C759"/>
+        </Style>
+        <Style Selector="ToggleSwitch:unchecked /template/ Border#SwitchArea">
+            <Setter Property="Background" Value="#787880"/>
+            <Setter Property="Opacity" Value="0.32"/>
+        </Style>
+        <Style Selector="Slider">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Slider /template/ Border#TrackBackground">
+            <Setter Property="Background" Value="#787880"/>
+            <Setter Property="Opacity" Value="0.3"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Height" Value="8"/>
+        </Style>
+        <Style Selector="Slider /template/ Border#TrackFill">
+            <Setter Property="Background" Value="#0A84FF"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Height" Value="8"/>
+        </Style>
+        <Style Selector="Slider /template/ Ellipse#Thumb">
+            <Setter Property="Fill" Value="#FFFFFF"/>
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+        </Style>
     </Application.Styles>
 </Application>

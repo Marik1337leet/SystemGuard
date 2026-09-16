@@ -14,6 +14,8 @@ public class KeyInputBlockerService : IDisposable
     private const int VK_TAB = 0x09;
     private const int VK_F4 = 0x73;
     private const int VK_MENU = 0x12;
+    private const int VK_CONTROL = 0x11;
+    private const int VK_ESCAPE = 0x1B;
 
     private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
@@ -84,8 +86,13 @@ public class KeyInputBlockerService : IDisposable
             {
                 int vkCode = Marshal.ReadInt32(lParam);
                 bool altDown = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+                bool ctrlDown = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
 
                 if (_blockWin && (vkCode == VK_LWIN || vkCode == VK_RWIN))
+                    return (IntPtr)1;
+
+                // Ctrl+Esc тоже открывает Start — режем вместе с Win.
+                if (_blockWin && vkCode == VK_ESCAPE && ctrlDown)
                     return (IntPtr)1;
 
                 if (_blockAltTab && vkCode == VK_TAB && altDown)

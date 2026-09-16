@@ -21,7 +21,10 @@ public class PowerService
                     Arguments = "/list",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    // powercfg на RU-Windows пишет в OEM-кодовой странице (CP866):
+                    // без этого кириллица превращается в «У « бЕаФу п».
+                    StandardOutputEncoding = CmdEncoding.Oem
                 }
             };
             process.Start();
@@ -42,7 +45,11 @@ public class PowerService
                 var parenEnd = line.LastIndexOf(')');
                 var name = parenStart >= 0 && parenEnd > parenStart
                     ? line[(parenStart + 1)..parenEnd].Trim()
-                    : "Unknown Plan";
+                    : "";
+                // Если имя пустое/битое (не та локаль/кодировка) — подставляем
+                // понятное по известному GUID, иначе короткий GUID.
+                if (string.IsNullOrWhiteSpace(name) || name.Contains('�'))
+                    name = FriendlyPlanName(guid);
 
                 plans.Add(new PowerPlanInfo
                 {
@@ -55,6 +62,15 @@ public class PowerService
         catch { }
         return plans;
     }
+
+    private static string FriendlyPlanName(string guid) => guid.ToLowerInvariant() switch
+    {
+        "381b4222-f694-41f0-9685-ff5bb260df2e" => "Balanced",
+        "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c" => "High performance",
+        "a1841308-3541-4fab-bc81-f71556f20b4a" => "Power saver",
+        "e9a42b02-d5df-448b-aa00-03f14749eb61" => "Ultimate Performance",
+        _ => $"Power plan {guid[..8]}…"
+    };
 
     public void SetActivePowerPlan(string guid)
     {

@@ -1,0 +1,27 @@
+SystemGuard — Лицензионное соглашение / License Agreement
+=========================================================
+
+RU:
+1. SystemGuard предоставляется «как есть». Автор не несёт ответственности
+   за потерю данных при использовании функций очистки, удаления программ,
+   твиков реестра и служб — перед опасными действиями делайте бэкап
+   (встроенные кнопки «Backup now» и «CreateRestorePoint»).
+2. Free-версия бесплатна для личного использования.
+   Pro/Enterprise-функции требуют оплаченной лицензии на каждое устройство,
+   если тариф не предусматривает иное (Multi-PC).
+3. Запрещено обходить лицензирование: подделка ключей, патчи, кейгены.
+4. Telegram-бот управления выполняет команды на ВАШЕМ ПК — храните токен
+   в тайне, права Admin выдавайте только себе.
+
+EN:
+1. SystemGuard is provided "as is". The author is not liable for data loss
+   caused by cleanup, uninstall, tweaks or service features — back up first
+   (built-in "Backup now" and "CreateRestorePoint" buttons).
+2. The Free version is free for personal use.
+   Pro/Enterprise features require a paid license per device unless the
+   plan states otherwise (Multi-PC).
+3. Circumventing licensing (forged keys, patches, keygens) is prohibited.
+4. The control Telegram bot executes commands on YOUR PC — keep the token
+   secret and grant Admin rights to yourself only.
+
+Support: https://t.me/mattrix_solution

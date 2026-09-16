@@ -184,6 +184,8 @@ public partial class ColorPickerViewModel : ViewModelBase
     {
         var name = string.IsNullOrWhiteSpace(NewProfileName) ? $"My Theme {CustomProfiles.Count + 1}" : NewProfileName.Trim();
         var theme = BuildThemeFromSlots(name);
+        EnsureReadableText(theme);
+        ApplyThemeToSlots(theme);
         _themeService.SaveProfile(theme);
         LoadCustomProfiles();
         NewProfileName = "";
@@ -311,9 +313,35 @@ public partial class ColorPickerViewModel : ViewModelBase
     private void Apply()
     {
         var theme = BuildThemeFromSlots("Current");
+        // Светлый фон + светлый текст = нечитаемо. Принудительно тёмный текст.
+        EnsureReadableText(theme);
+        ApplyThemeToSlots(theme);
         _themeService.ApplyTheme(theme);
         StatusText = "Theme applied — app + widgets updated";
         ClearStatus();
+    }
+
+    // Светлая карточка/фон со светлым текстом — текст всегда делаем тёмным,
+    // иначе на светлых темах его не видно.
+    private static void EnsureReadableText(AppTheme t)
+    {
+        try
+        {
+            bool surfaceLight = IsLightHex(t.Card) || IsLightHex(t.Bg);
+            if (surfaceLight && IsLightHex(t.Text)) t.Text = "#111318";
+            if (surfaceLight && IsLightHex(t.TextMuted)) t.TextMuted = "#5B6472";
+        }
+        catch { }
+    }
+
+    private static bool IsLightHex(string hex)
+    {
+        try
+        {
+            var c = Color.Parse(hex.StartsWith('#') ? hex : '#' + hex);
+            return (0.299 * c.R + 0.587 * c.G + 0.114 * c.B) / 255.0 > 0.6;
+        }
+        catch { return false; }
     }
 
     private void ApplyPreset(ColorPresetItem? p)
@@ -325,6 +353,7 @@ public partial class ColorPickerViewModel : ViewModelBase
             Accent = p.Accent, AccentLight = p.AccentLight, Text = p.Text, TextMuted = p.TextMuted,
             Danger = p.Danger, Success = p.Success, Warning = p.Warning, Info = p.Info
         };
+        EnsureReadableText(theme);
         ApplyThemeToSlots(theme);
         Apply();
         if (SelectedSlot != null) SelectSlot(SelectedSlot);

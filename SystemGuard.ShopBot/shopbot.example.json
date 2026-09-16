@@ -1,0 +1,10 @@
+{
+  // НЕ клади сюда настоящий токен из чата — он уже засвечен, перевыпусти через BotFather.
+  // Файл: %LocalAppData%\SystemGuard\shopbot.json  (скопируй этот пример туда и заполни)
+  // Приоритет выше у переменной окружения SHOP_BOT_TOKEN.
+  "botToken": "PASTE_NEW_TOKEN_FROM_BOTFATHER",
+  "ownerId": 0,
+  "supabaseUrl": "",
+  "supabaseServiceKey": "",
+  "cryptoPayToken": ""
+}

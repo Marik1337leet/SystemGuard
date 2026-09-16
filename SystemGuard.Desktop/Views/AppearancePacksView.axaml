@@ -62,8 +62,6 @@
             <!-- ══════ Header ══════ -->
             <StackPanel Spacing="2" Margin="0,0,0,18">
                 <TextBlock Text="{loc:Loc Appearance}" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
-                <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource TextMutedBrush}"
-                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
             </StackPanel>
 
             <!-- ══════ Hero: safety ══════ -->
@@ -207,15 +205,12 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Sounds + Explorer -->
+                <!-- Explorer -->
                 <Border CornerRadius="24" Background="{DynamicResource CardBrush}"
                         BorderBrush="#1FFFFFFF" BorderThickness="1"
                         BoxShadow="0 8 24 -8 #4D000000" Padding="20">
                     <StackPanel Spacing="10">
-                        <TextBlock Text="Sounds &amp; Explorer" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
-                        <ComboBox ItemsSource="{Binding SoundSchemes}" SelectedItem="{Binding SelectedSound}"
-                                  Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
-                                  Foreground="{DynamicResource TextBrush}" Padding="14,10"/>
+                        <TextBlock Text="Explorer" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
                         <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
                             <TextBlock Text="Hidden files" FontSize="12" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding HiddenFiles}"/>

@@ -83,6 +83,54 @@ public static class SelfProtection
         return false;
     }
 
+    // ── Remote-чтение (/api/file, бот /get, листинг): что НЕ отдаём наружу ──
+    // Даже с валидным токеном нельзя скачать: папку данных SystemGuard
+    // (bot-токены, live-токен, license.dat, supabase.json, продажи),
+    // каталог Windows (SAM/SYSTEM хайвы, credentials) и профили ЧУЖИХ
+    // пользователей. Свои документы/файлы — можно.
+    // Возвращает null если можно, иначе причину блокировки.
+    public static string? BlockedForRemoteRead(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return "Empty path";
+        string full;
+        try { full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar); }
+        catch { return "Bad path"; }
+
+        if (IsProtectedPath(path)) return "SystemGuard data folder is hidden";
+
+        try
+        {
+            var win = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            if (!string.IsNullOrEmpty(win))
+            {
+                var w = Path.GetFullPath(win).TrimEnd(Path.DirectorySeparatorChar);
+                if (full.Equals(w, StringComparison.OrdinalIgnoreCase) ||
+                    full.StartsWith(w + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    return "Windows folder is hidden";
+            }
+        }
+        catch { }
+
+        try
+        {
+            // C:\Users\<чужой>\... — чужие профили скрыты, свой разрешён.
+            var usersRoot = Path.GetFullPath(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".."))
+                .TrimEnd(Path.DirectorySeparatorChar);
+            var ownProfile = Path.GetFullPath(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
+                .TrimEnd(Path.DirectorySeparatorChar);
+            if (full.StartsWith(usersRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
+                !full.Equals(ownProfile, StringComparison.OrdinalIgnoreCase) &&
+                !full.StartsWith(ownProfile + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
+                !full.StartsWith(Path.Combine(usersRoot, "Public") + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                return "Other users profiles are hidden";
+        }
+        catch { }
+
+        return null;
+    }
+
     public static bool IsProtectedProgram(string? name, string? installLocation)
     {
         if (!string.IsNullOrWhiteSpace(name) &&

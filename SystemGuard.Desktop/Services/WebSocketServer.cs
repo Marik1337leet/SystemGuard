@@ -261,6 +261,19 @@ public class WebSocketServer : IDisposable
             });
         }
 
+        // Анти-инъекция: allowlist проверял только первое слово, а выполнялась
+        // вся строка через cmd.exe — "ping 8.8.8.8 & whoami" проходил.
+        // Блокируем chaining/redirect/substitution до строгого парсера аргументов.
+        const string forbidden = "&|;$`()<>!\n\r";
+        if (command.IndexOfAny(forbidden.ToCharArray()) >= 0)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                type = "error",
+                message = "Chained commands are not allowed — one simple command only"
+            });
+        }
+
         try
         {
             var psi = new ProcessStartInfo("cmd.exe", $"/c {command}")

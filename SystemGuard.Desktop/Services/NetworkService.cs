@@ -265,28 +265,9 @@ public class NetworkService
         try { System.Diagnostics.Process.Start("ipconfig", "/flushdns"); } catch { }
     }
 
-    // Быстрый замер скорости: скачивание 10 МБ с CDN, замер времени.
-    // Честный тест последней мили без сторонних библиотек.
-    public async Task<(bool Ok, double Mbps, string Detail)> TestDownloadSpeedAsync()
-    {
-        const string url = "https://cachefly.cachefly.net/10mb.test";
-        try
-        {
-            using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(60) };
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var data = await http.GetByteArrayAsync(url);
-            sw.Stop();
-            if (data.Length == 0 || sw.Elapsed.TotalSeconds <= 0)
-                return (false, 0, "Empty response");
-            double mbps = data.Length * 8.0 / sw.Elapsed.TotalSeconds / 1_000_000.0;
-            return (true, Math.Round(mbps, 1),
-                $"{data.Length / 1048576} MB in {sw.Elapsed.TotalSeconds:F1}s");
-        }
-        catch (Exception ex)
-        {
-            return (false, 0, ex.Message);
-        }
-    }
+    // Замер скорости: делегируем мультизеркальному SpeedTestService.
+    public async Task<(bool Ok, double Mbps, string Detail)> TestDownloadSpeedAsync() =>
+        await SpeedTestService.RunDownloadTestAsync().ConfigureAwait(false);
 
     public void ResetNetwork()
     {
@@ -344,7 +325,7 @@ public class NetworkService
 
     public static string NetworkQualitySummary(double avgMs, double jitterMs, double loss)
     {
-        if (avgMs < 0) return "offline";
+        if (avgMs < 0) return "Unknown (ICMP blocked?)";
         if (loss > 10 || avgMs > 300) return "Poor";
         if (loss > 2 || avgMs > 120 || jitterMs > 40) return "Average";
         if (avgMs > 50 || jitterMs > 15) return "Good";

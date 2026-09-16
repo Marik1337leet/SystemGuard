@@ -58,10 +58,6 @@ public partial class AppearancePacksViewModel : ViewModelBase
     [ObservableProperty] private ObservableCollection<DesktopIconRow> _desktopIcons = new();
     [ObservableProperty] private int _iconSize = 32;
 
-    // ── Style: sounds ──
-    [ObservableProperty] private ObservableCollection<string> _soundSchemes = new();
-    [ObservableProperty] private string _selectedSound = ".Default";
-
     // ── Style: explorer ──
     [ObservableProperty] private bool _hiddenFiles;
     [ObservableProperty] private bool _showExtensions = true;
@@ -177,8 +173,6 @@ public partial class AppearancePacksViewModel : ViewModelBase
         DesktopIcons = new ObservableCollection<DesktopIconRow>(
             _service.GetDesktopIcons().Select(kv => new DesktopIconRow(_service, kv.Key, kv.Value)));
         _iconSize = _service.IconSize(); OnPropertyChanged(nameof(IconSize));
-        SoundSchemes = new ObservableCollection<string>(_service.GetSoundSchemes());
-        _selectedSound = _service.CurrentSoundScheme(); OnPropertyChanged(nameof(SelectedSound));
         _hiddenFiles = _service.ShowHiddenFiles(); OnPropertyChanged(nameof(HiddenFiles));
         _showExtensions = _service.ShowExtensions(); OnPropertyChanged(nameof(ShowExtensions));
         _launchToThisPC = _service.LaunchToThisPC(); OnPropertyChanged(nameof(LaunchToThisPC));
@@ -241,12 +235,6 @@ public partial class AppearancePacksViewModel : ViewModelBase
         if (_loading) return;
         _service.SetIconSize(value);
         StatusText = $"Icon size: {value}px (restart Explorer to apply)";
-    }
-    partial void OnSelectedSoundChanged(string value)
-    {
-        if (_loading) return;
-        StatusText = _service.ApplySoundScheme(value)
-            ? $"Sound scheme: {_service.SoundDisplayName(value)}" : "Cannot apply scheme";
     }
     partial void OnHiddenFilesChanged(bool value)
     {

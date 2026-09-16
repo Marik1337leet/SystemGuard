@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:controls="using:SystemGuard.Desktop.Controls"
              x:Class="SystemGuard.Desktop.Views.LicenseView"
              x:DataType="vm:LicenseViewModel">
 
@@ -60,10 +61,6 @@
                             </StackPanel>
                         </Border>
 
-                        <TextBlock Text="{Binding StatusText}" FontSize="13" FontWeight="SemiBold"
-                                   Foreground="{Binding StatusColor}"
-                                   HorizontalAlignment="Center"/>
-
                         <StackPanel HorizontalAlignment="Center" Spacing="2"
                                     IsVisible="{Binding IsLicenseActive}">
                             <TextBlock FontSize="40" FontWeight="Black" Foreground="{DynamicResource AccentBrush}"
@@ -114,20 +111,50 @@
                         <StackPanel Spacing="2" HorizontalAlignment="Center">
                             <TextBlock Text="Monthly" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
                             <TextBlock Text="300 stars" FontSize="10" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="4 USDT" FontSize="9" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Center">
                             <TextBlock Text="Half-Year" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
                             <TextBlock Text="1000 stars" FontSize="10" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="12 USDT" FontSize="9" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Center">
                             <TextBlock Text="Yearly" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
                             <TextBlock Text="1800 stars" FontSize="10" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="20 USDT" FontSize="9" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                         </StackPanel>
                         <StackPanel Grid.Column="3" Spacing="2" HorizontalAlignment="Center">
                             <TextBlock Text="Lifetime" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"/>
                             <TextBlock Text="3000 stars" FontSize="10" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="35 USDT" FontSize="9" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Buy Pro: основной путь покупки (Stars + криптоплатежка в шоп-боте).
+                 Ключ пользователю видеть не нужно — бот привяжет его к этому ПК. -->
+            <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
+                    BorderThickness="1" CornerRadius="22" Padding="22"
+                    BoxShadow="0 8 24 -8 #4D000000">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Get Pro" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextBrush}"/>
+                    <TextBlock Text="{Binding ProHelpText}"
+                               FontSize="11" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+                    <WrapPanel>
+                        <Button Classes="pill pillPrimary" Content="Buy Pro in Telegram"
+                                Command="{Binding OpenShopBotCommand}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGlass" Content="I paid — check"
+                                Command="{Binding CheckPurchaseCommand}"
+                                IsEnabled="{Binding !IsActivating}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGhost" Content="Support"
+                                Command="{Binding OpenSupportCommand}" Margin="0,0,8,8"/>
+                        <Button Classes="pill pillGhost" Content="I have a gift key (giveaway)"
+                                Command="{Binding ToggleGiftKeyCommand}" Margin="0,0,8,8"/>
+                    </WrapPanel>
+                    <TextBlock Text="Оплата: Telegram Stars и криптоплатежка — внутри шоп-бота. После оплаты ключ привязывается к этому ПК."
+                               FontSize="10" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -146,13 +173,19 @@
                 </StackPanel>
             </Border>
 
-            <!-- Activation -->
+            <!-- Activation: только для подарочных ключей с розыгрышей -->
             <Border Background="{DynamicResource CardBrush}" BorderBrush="#1FFFFFFF"
                     BorderThickness="1" CornerRadius="22" Padding="22"
-                    BoxShadow="0 8 24 -8 #4D000000">
+                    BoxShadow="0 8 24 -8 #4D000000"
+                    IsVisible="{Binding IsGiftKeyVisible}">
                 <StackPanel Spacing="12">
-                    <TextBlock Text="Activate Pro" FontSize="14" FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextBrush}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Text="Activate Pro" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                        <controls:LockBadge />
+                    </StackPanel>
+                    <TextBlock Text="Только для подарочных ключей с розыгрышей. Купленные ключи вставлять не нужно — они привязываются автоматически."
+                               FontSize="10" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBox Text="{Binding ActivationKey}" Watermark="SG-PRO-…"
                                  Background="#14FFFFFF" BorderThickness="0" CornerRadius="14"
@@ -166,7 +199,7 @@
                                Foreground="{Binding ActivationMessageColor}"
                                IsVisible="{Binding ActivationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                     <WrapPanel>
-                        <Button Classes="pill pillGhost" Content="Deactivate"
+                        <Button Classes="pill pillGhost" Content="{Binding DeactivateButtonText}"
                                 Command="{Binding DeactivateCommand}"
                                 IsVisible="{Binding IsLicenseActive}" Margin="0,0,8,8"/>
                         <Button Classes="pill pillGlass" Content="Get key in Telegram"

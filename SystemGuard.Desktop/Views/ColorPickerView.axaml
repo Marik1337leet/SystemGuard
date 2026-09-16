@@ -382,14 +382,6 @@
                             Padding="22,15" Command="{Binding ResetCommand}"/>
                 </Grid>
 
-                <Border Background="{DynamicResource CardBrush}" CornerRadius="16" Padding="16,10"
-                        BorderBrush="#1FFFFFFF" BorderThickness="1"
-                        IsVisible="{Binding StatusText,
-                            Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                    <TextBlock Text="{Binding StatusText}"
-                               Foreground="{DynamicResource AccentBrush}" FontSize="11"/>
-                </Border>
-
             </StackPanel>
         </Grid>
     </ScrollViewer>

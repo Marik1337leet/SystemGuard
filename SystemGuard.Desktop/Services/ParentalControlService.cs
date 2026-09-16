@@ -37,19 +37,42 @@ public class ParentalControlService
         catch { return new List<string>(); }
     }
 
+    public static string NormalizeHost(string? site)
+    {
+        if (string.IsNullOrWhiteSpace(site)) return "";
+        var s = site.Trim().ToLowerInvariant();
+        foreach (var scheme in new[] { "https://", "http://" })
+            if (s.StartsWith(scheme)) { s = s[scheme.Length..]; break; }
+        foreach (var sep in new[] { '/', '?', '#' })
+        {
+            var i = s.IndexOf(sep);
+            if (i >= 0) s = s[..i];
+        }
+        s = s.Trim().TrimEnd('.');
+        if (s.Contains(' ') || s.Contains(':') || !s.Contains('.')) return "";
+        return s;
+    }
+
     public string Block(string site)
     {
         try
         {
-            site = site.Trim().ToLowerInvariant();
-            if (string.IsNullOrWhiteSpace(site)) return "Empty site";
+            // Блокируем и голый домен, и www-поддомен: раньше резался только
+            // точный ввод, и сайт спокойно открывался через www.example.com.
+            var host = NormalizeHost(site);
+            if (string.IsNullOrWhiteSpace(host)) return "Enter a valid domain, e.g. example.com";
             var text = File.Exists(_hostsPath) ? File.ReadAllText(_hostsPath) : "";
             var current = ListBlocked();
-            if (current.Contains(site)) return $"{site} already blocked";
-            current.Add(site);
+            var targets = host.StartsWith("www.")
+                ? new[] { host }
+                : new[] { host, "www." + host };
+            bool added = false;
+            foreach (var t in targets)
+                if (!current.Contains(t)) { current.Add(t); added = true; }
+            if (!added) return $"{host} already blocked";
             File.WriteAllText(_hostsPath, RenderBlock(text, current));
             try { System.Diagnostics.Process.Start("ipconfig", "/flushdns"); } catch { }
-            return $"{site} blocked";
+            return $"{host} blocked";
         }
         catch (Exception ex) { return $"Block failed: {ex.Message} (run as admin)"; }
     }
@@ -58,11 +81,16 @@ public class ParentalControlService
     {
         try
         {
+            var host = NormalizeHost(site);
+            if (string.IsNullOrWhiteSpace(host)) host = site.Trim().ToLowerInvariant();
+            var buddies = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                { host, "www." + host.TrimStart() };
+            if (host.StartsWith("www.")) buddies.Add(host[4..]);
             var current = ListBlocked();
-            current.RemoveAll(s => s.Equals(site.Trim().ToLowerInvariant(), StringComparison.OrdinalIgnoreCase));
+            current.RemoveAll(s => buddies.Contains(s));
             var text = File.Exists(_hostsPath) ? File.ReadAllText(_hostsPath) : "";
             File.WriteAllText(_hostsPath, RenderBlock(text, current));
-            return $"{site} unblocked";
+            return $"{host} unblocked";
         }
         catch (Exception ex) { return $"Unblock failed: {ex.Message}"; }
     }

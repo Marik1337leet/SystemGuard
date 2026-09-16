@@ -26,24 +26,35 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _latestVersion = "";
     [ObservableProperty] private bool _isUpdateAvailable;
     [ObservableProperty] private string _releaseUrl = "";
+    [ObservableProperty] private bool _isDownloadingUpdate;
+    [ObservableProperty] private double _updateProgress;
+    private string _setupAssetUrl = "";
+    private string _setupAssetName = "";
     [ObservableProperty] private string _accountEmail = "";
     [ObservableProperty] private string _accountProvider = "";
     [ObservableProperty] private bool _isSignedIn;
     [ObservableProperty] private string _accountStatus = "";
     [ObservableProperty] private bool _isSigningIn;
+    // About + политики (видны в Settings → About, дублируют /privacy /terms /safety в боте)
+    public string AboutTitle => "SystemGuard";
+    public string AboutSubtitle => "Монитор, твикер и удалённый пульт для Windows";
+    public string PrivacyText => PoliciesService.Privacy;
+    public string TermsText => PoliciesService.Terms;
+    public string SafetyText => PoliciesService.Safety;
+    public string StarsOwnerText => $"Stars → владелец {PoliciesService.StarsOwnerId} (вывод через Fragment)";
+    public string RemoteHelpText => PoliciesService.FeatureNotes;
 
-    // Подвкладки настроек: General / Appearance / Colors / Telegram / Scheduler / License.
+    // Подвкладки настроек: General / Colors / Telegram / License.
+    // Appearance удалена (виджеты переехали в General), Scheduler удалён полностью.
+    // Hotkeys живут в Gaming, Fans — в Performance.
     [ObservableProperty] private LicenseViewModel _license = new();
     [ObservableProperty] private ColorPickerViewModel _colors = new();
     [ObservableProperty] private AppearancePacksViewModel _appearance = new();
     [ObservableProperty] private TelegramViewModel _telegram = new();
-    [ObservableProperty] private SchedulerViewModel _scheduler = new();
     [ObservableProperty] private string _selectedSection = "General";
     [ObservableProperty] private bool _isGeneralTab = true;
-    [ObservableProperty] private bool _isAppearanceTab;
     [ObservableProperty] private bool _isColorsTab;
     [ObservableProperty] private bool _isTelegramTab;
-    [ObservableProperty] private bool _isSchedulerTab;
     [ObservableProperty] private bool _isLicenseTab;
 
     public IRelayCommand<string> SelectTabCommand { get; }
@@ -56,7 +67,7 @@ public partial class SettingsViewModel : ViewModelBase
     public IRelayCommand ImportCommand { get; }
     public IRelayCommand CheckUpdateCommand { get; }
     public IRelayCommand OpenReleasePageCommand { get; }
-    public IRelayCommand OpenAppDataCommand { get; }
+    public IRelayCommand InstallUpdateCommand { get; }
     public IRelayCommand SignInGoogleCommand { get; }
     public IRelayCommand SignInAppleCommand { get; }
     public IRelayCommand SignOutCommand { get; }
@@ -68,9 +79,9 @@ public partial class SettingsViewModel : ViewModelBase
         ResetCommand = new RelayCommand(Reset);
         ExportCommand = new AsyncRelayCommand(ExportAsync);
         ImportCommand = new AsyncRelayCommand(ImportAsync);
-        CheckUpdateCommand = new AsyncRelayCommand(CheckUpdate);
+        CheckUpdateCommand = new AsyncRelayCommand(() => CheckUpdateAsync(silent: false));
         OpenReleasePageCommand = new RelayCommand(OpenReleasePage);
-        OpenAppDataCommand = new RelayCommand(OpenAppData);
+        InstallUpdateCommand = new AsyncRelayCommand(InstallUpdateAsync);
         SignInGoogleCommand = new AsyncRelayCommand(SignInGoogleAsync);
         SignInAppleCommand = new AsyncRelayCommand(SignInAppleAsync);
         SignOutCommand = new RelayCommand(SignOut);
@@ -83,23 +94,56 @@ public partial class SettingsViewModel : ViewModelBase
     private void SelectTab(string? tab)
     {
         if (string.IsNullOrEmpty(tab)) return;
+        // Удаленные табы маппим на живые: Appearance → General (там виджеты), Scheduler → License.
+        if (tab == "Appearance") tab = "General";
+        if (tab == "Scheduler") tab = "License";
         SelectedSection = tab;
         IsGeneralTab = tab == "General";
-        IsAppearanceTab = tab == "Appearance";
         IsColorsTab = tab == "Colors";
         IsTelegramTab = tab == "Telegram";
-        IsSchedulerTab = tab == "Scheduler";
         IsLicenseTab = tab == "License";
     }
+
+    /// <summary>Открыть таб покупки/управления лицензией (для бейджа слева снизу).</summary>
+    public void SelectLicenseTab() => SelectTab("License");
 
     public override void OnActivated()
     {
         base.OnActivated();
+        // Буфер обмена живёт на TopLevel: даём LicenseVM reader для кнопки «Я оплатил».
+        Services.SupabaseLicenseClient.ClipboardReader = async () =>
+        {
+            try
+            {
+                if (OwnerWindow?.Clipboard == null) return null;
+                return await OwnerWindow.Clipboard.GetTextAsync();
+            }
+            catch { return null; }
+        };
         License.OnActivated();
         Colors.OnActivated();
         Appearance.OnActivated();
         Telegram.OnActivated();
-        Scheduler.OnActivated();
+        // Тихая проверка при входе в настройки, не чаще раза в сутки.
+        try
+        {
+            if (Settings.AutoUpdate && IsUpdateCheckStale())
+                _ = CheckUpdateAsync(silent: true);
+        }
+        catch { }
+    }
+
+    private bool IsUpdateCheckStale()
+    {
+        try
+        {
+            var last = Settings.LastCheckUpdate;
+            if (string.IsNullOrWhiteSpace(last) || last == "Never") return true;
+            if (DateTime.TryParse(last, out var dt))
+                return (DateTime.Now - dt).TotalHours >= 24;
+            return true;
+        }
+        catch { return true; }
     }
 
     public override void OnDeactivated()
@@ -109,7 +153,21 @@ public partial class SettingsViewModel : ViewModelBase
         Colors.OnDeactivated();
         Appearance.OnDeactivated();
         Telegram.OnDeactivated();
-        Scheduler.OnDeactivated();
+    }
+
+    // Каскад Pro-флага во вложенные VM: без него Telegram/Scheduler/License
+    // навсегда оставались IsProLicense=false и показывали замки при активной Pro.
+    public override void RefreshLicenseGate()
+    {
+        base.RefreshLicenseGate();
+        try
+        {
+            License.RefreshLicenseGate();
+            Colors.RefreshLicenseGate();
+            Appearance.RefreshLicenseGate();
+            Telegram.RefreshLicenseGate();
+        }
+        catch { }
     }
 
     // ── Account (Google / Apple) ────────────────────────────────────────────
@@ -262,20 +320,23 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
-    private async Task CheckUpdate()
+    private async Task CheckUpdateAsync(bool silent)
     {
+        if (IsCheckingUpdate || IsDownloadingUpdate) return;
         IsCheckingUpdate = true;
         IsUpdateAvailable = false;
-        StatusText = "Checking for updates on GitHub…";
+        if (!silent) StatusText = "Checking for updates on GitHub…";
         try
         {
             var svc = new UpdateService();
             var res = await svc.CheckAsync();
             Settings.LastCheckUpdate = DateTime.Now.ToString("g");
             _settingsService.Save(Settings);
+            _setupAssetUrl = res.SetupAssetUrl;
+            _setupAssetName = res.SetupAssetName;
             if (!res.Success)
             {
-                StatusText = $"Update check failed: {res.Error} (offline?)";
+                if (!silent) StatusText = $"Update check failed: {res.Error} (offline?)";
             }
             else
             {
@@ -284,16 +345,45 @@ public partial class SettingsViewModel : ViewModelBase
                 if (res.HasUpdate)
                 {
                     IsUpdateAvailable = true;
-                    StatusText = $"Update available: v{res.Latest} (current v{res.Current})";
+                    if (!silent) StatusText = $"Update available: v{res.Latest} (current v{res.Current})";
                 }
-                else
+                else if (!silent)
                 {
                     StatusText = $"You are running the latest version (v{res.Current})";
                 }
             }
         }
-        catch (Exception ex) { StatusText = $"Update check failed: {ex.Message}"; }
-        finally { IsCheckingUpdate = false; ClearStatusAfterDelay(); }
+        catch (Exception ex) { if (!silent) StatusText = $"Update check failed: {ex.Message}"; }
+        finally { IsCheckingUpdate = false; if (!silent) ClearStatusAfterDelay(); }
+    }
+
+    // Тихая установка: качает SystemGuard-Setup-*.exe из релиза и запускает /SILENT.
+    // Без ассета в релизе — открывает страницу релиза как раньше.
+    private async Task InstallUpdateAsync()
+    {
+        if (IsDownloadingUpdate || IsCheckingUpdate) return;
+        if (string.IsNullOrWhiteSpace(_setupAssetUrl))
+        {
+            OpenReleasePage();
+            return;
+        }
+        IsDownloadingUpdate = true;
+        UpdateProgress = 0;
+        StatusText = $"Downloading {_setupAssetName}…";
+        try
+        {
+            var svc = new UpdateService();
+            var progress = new Progress<double>(p =>
+            {
+                UpdateProgress = p;
+                StatusText = $"Downloading update… {p:F0}%";
+            });
+            var (ok, path, error) = await svc.DownloadSetupAsync(_setupAssetUrl, _setupAssetName, progress);
+            if (!ok) { StatusText = $"Download failed: {error}"; return; }
+            StatusText = UpdateService.LaunchSetupAndExit(path);
+        }
+        catch (Exception ex) { StatusText = $"Update failed: {ex.Message}"; }
+        finally { IsDownloadingUpdate = false; }
     }
 
     private void OpenReleasePage()
@@ -303,15 +393,6 @@ public partial class SettingsViewModel : ViewModelBase
             var url = string.IsNullOrWhiteSpace(ReleaseUrl) ? "https://github.com/marik1337leet/SystemGuard/releases/latest" : ReleaseUrl;
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
-        catch { }
-    }
-
-    private void OpenAppData()
-    {
-        var path = System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "SystemGuard");
-        try { Process.Start("explorer.exe", path); }
         catch { }
     }
 

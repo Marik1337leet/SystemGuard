@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:SystemGuard.Desktop.ViewModels"
+             xmlns:controls="using:SystemGuard.Desktop.Controls"
              xmlns:services="using:SystemGuard.Desktop.Services"
              x:Class="SystemGuard.Desktop.Views.SchedulerView"
              x:DataType="vm:SchedulerViewModel">
@@ -37,7 +38,19 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,Auto,*">
+    <!-- Pro-гейт: баннер только на Free, форма ниже блокируется -->
+    <Grid RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Margin="0,0,0,12" Padding="14,12" CornerRadius="18"
+                Background="#33C96C9E" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                IsVisible="{Binding !IsProLicense}">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <controls:LockBadge VerticalAlignment="Center" />
+                <TextBlock Text="PRO-раздел: планировщик доступен с Pro-лицензией. Купить — кнопка слева снизу (Settings → License)."
+                           FontSize="11" Foreground="{DynamicResource TextBrush}"
+                           VerticalAlignment="Center" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+        <Grid Grid.Row="1" RowDefinitions="Auto,Auto,*" IsEnabled="{Binding IsProLicense}">
 
         <!-- ── New Task Form ──────────────────────────────────────────────── -->
         <Panel Grid.Row="0" Margin="0,0,0,12">
@@ -145,12 +158,8 @@
                                    Foreground="{DynamicResource AccentBrush}"
                                    Text="{Binding ActiveTaskCount}" VerticalAlignment="Center"/>
                     </StackPanel>
-                    <TextBlock Grid.Column="2" Text="{Binding StatusText}"
-                               FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
-                               VerticalAlignment="Center" Margin="20,0,0,0"
-                               TextTrimming="CharacterEllipsis" MaxLines="1"/>
                     <Button Grid.Column="3" Classes="pill pillGhost" Content="Refresh"
-                            Command="{Binding RefreshCommand}"/>
+                            Command="{Binding RefreshCommand}" HorizontalAlignment="Right"/>
                 </Grid>
                 <Grid ColumnDefinitions="*,Auto">
                     <TextBox Text="{Binding SlackWebhook}" Watermark="Slack webhook URL for reports…"
@@ -242,5 +251,6 @@
             </ItemsControl>
         </ScrollViewer>
 
+        </Grid>
     </Grid>
 </UserControl>
