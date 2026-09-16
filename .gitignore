@@ -4,6 +4,9 @@ obj/
 out/
 publish/
 
+## Installer output (built locally, distributed via GitHub Releases)
+SystemGuard.Installer/Output/
+
 ## Visual Studio / Rider
 .vs/
 .vscode/

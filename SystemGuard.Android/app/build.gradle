@@ -6,6 +6,7 @@ plugins {
 android {
     namespace 'com.systemguard.remote'
     compileSdk 36
+    buildToolsVersion '36.0.0'
 
     defaultConfig {
         applicationId 'com.systemguard.remote'

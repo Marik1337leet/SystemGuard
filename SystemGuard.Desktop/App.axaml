@@ -79,9 +79,6 @@
         <DataTemplate DataType="vm:TelegramViewModel">
             <views:TelegramView/>
         </DataTemplate>
-        <DataTemplate DataType="vm:SchedulerViewModel">
-            <views:SchedulerView/>
-        </DataTemplate>
         <DataTemplate DataType="vm:LicenseViewModel">
             <views:LicenseView/>
         </DataTemplate>

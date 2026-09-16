@@ -119,7 +119,7 @@ class BotRelayClient(private val store: SecureStore) {
                 if (!r.isSuccessful || !body.contains("\"ok\":true"))
                     return@withContext RelayResult.Err("Токен бота неверный (Bot API отказал)")
             }
-            RelayResult.Ok("Бот найден", "")
+            RelayResult.Ok("Бот найден", "", JSONObject())
         } catch (e: Exception) {
             RelayResult.Err(humanize(e))
         }
