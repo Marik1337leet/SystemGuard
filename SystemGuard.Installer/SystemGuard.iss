@@ -1,12 +1,12 @@
 ; SystemGuard — установщик (Inno Setup 6+).
 ; Сборка:
-;   1. dotnet publish ..\SystemGuard.Desktop\SystemGuard.Desktop.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:Version=2.0.0 -o ..\publish\win-x64
+;   1. dotnet publish ..\SystemGuard.Desktop\SystemGuard.Desktop.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:Version=2.1.1 -o ..\publish\win-x64
 ;   2. ISCC.exe SystemGuard.iss   (запускать из папки SystemGuard.Installer)
 ; Источник файлов — ..\publish\win-x64 (single-file: один exe; wildcard на будущее,
 ; если публикация станет многофайловой). PDB/XML в установщик не пакуются.
 
 #define MyAppName "SystemGuard"
-#define MyAppVersion "2.1.0"
+#define MyAppVersion "2.1.1"
 #define MyAppPublisher "SystemGuard"
 #define MyAppURL "https://t.me/mattrix_solution"
 #define MyAppExeName "SystemGuard.exe"
