@@ -15,6 +15,7 @@
         <converters:BoolToOpacityConverter     x:Key="BoolToOpacityConverter"/>
         <converters:ActionToColorConverter     x:Key="ActionToColorConverter"/>
         <converters:TabBrushConverter          x:Key="TabBrushConverter"/>
+        <converters:SectionToTabMarginConverter x:Key="SectionToTabMarginConverter"/>
         <converters:HexToColorConverter        x:Key="HexToColorConverter"/>
         <converters:StringNotEmptyConverter    x:Key="StringNotEmptyConverter"/>
 

@@ -65,6 +65,7 @@ public static class RemoteActions
                 battery = batt,
                 uptime = upStr,
                 mouseOn = RemoteInputService.MouseEnabled,
+                kbdOn = RemoteInputService.KeyboardEnabled,
                 disks
             };
         }
@@ -74,7 +75,7 @@ public static class RemoteActions
         }
     }
 
-    public static async Task<(byte[]? Jpeg, string Error)> GetCamJpegAsync()
+    public static async Task<(byte[]? Jpeg, string Error)> GetCamJpegAsync(int maxWidth = 960, int quality = 70)
     {
         // Кадр кэшируем на 4с: и бот, и HTTP дёргают часто
         await _camGate.WaitAsync().ConfigureAwait(false);
@@ -82,7 +83,7 @@ public static class RemoteActions
         {
             if (_camCache != null && (DateTime.UtcNow - _camCacheAt).TotalSeconds < 4)
                 return (_camCache, "");
-            var (jpg, err) = await WebcamService.CaptureJpegAsync().ConfigureAwait(false);
+            var (jpg, err) = await WebcamService.CaptureJpegAsync(maxWidth, quality).ConfigureAwait(false);
             if (jpg != null) { _camCache = jpg; _camCacheAt = DateTime.UtcNow; }
             return (jpg, err);
         }
@@ -90,9 +91,9 @@ public static class RemoteActions
     }
 
     // Свежий кадр без кэша — для MJPEG-потока камеры (до 60 FPS в сессии).
-    public static async Task<(byte[]? Jpeg, string Error)> GetCamJpegFreshAsync()
+    public static async Task<(byte[]? Jpeg, string Error)> GetCamJpegFreshAsync(int maxWidth = 640)
     {
-        var (jpg, err) = await WebcamService.CaptureJpegAsync(640).ConfigureAwait(false);
+        var (jpg, err) = await WebcamService.CaptureJpegAsync(maxWidth).ConfigureAwait(false);
         return (jpg, err);
     }
 
@@ -154,6 +155,9 @@ public static class RemoteActions
                     var o = await ExecAsync(arg).ConfigureAwait(false);
                     return new { ok = true, message = "Done", output = CmdEncoding.Clean(o, 6000) };
                 case "ls": return ListDir(arg);
+                case "drives": return ListDrives();
+                case "file_delete": return DeleteRemotePath(arg);
+                case "file_mkdir": return MakeRemoteDir(arg);
                 // Один канонический список процессов (богатый: items + текст).
                 // "procs" оставлен как alias для совместимости старых клиентов.
                 case "processes": case "procs": return ProcList();
@@ -223,6 +227,16 @@ public static class RemoteActions
                     if (!on && !off) return Fail("Use mouse_enable on|off");
                     RemoteInputService.MouseEnabled = on;
                     return Ok(on ? "Mouse control ON" : "Mouse control OFF");
+                }
+                case "kbd_enable":
+                {
+                    // Свич клавиатуры из WebApp: on | off (1/0, вкл/выкл, true/false).
+                    var v = arg.Trim().ToLowerInvariant();
+                    bool on = v is "on" or "1" or "true" or "yes" or "вкл" or "да";
+                    bool off = v is "off" or "0" or "false" or "no" or "выкл" or "нет";
+                    if (!on && !off) return Fail("Use kbd_enable on|off");
+                    RemoteInputService.KeyboardEnabled = on;
+                    return Ok(on ? "Keyboard control ON" : "Keyboard control OFF");
                 }
                 case "mouse_move":
                 {                    // arg: "dx,dy" — относительные пиксели от тачпада WebApp.
@@ -434,24 +448,236 @@ public static class RemoteActions
                 dir = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             dir = dir.Trim().Trim('"');
             if (!Directory.Exists(dir)) return Fail("Not a folder");
-            var items = new List<object>();
-            foreach (var e in Directory.GetFileSystemEntries(dir).Take(60))
+            var full = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar);
+            string? parent = null;
+            try
+            {
+                var p = Directory.GetParent(full);
+                if (p != null) parent = p.FullName;
+            }
+            catch { }
+            var dirs = new List<object>();
+            var files = new List<object>();
+            foreach (var e in Directory.GetFileSystemEntries(full).Take(400))
             {
                 try
                 {
                     if (Directory.Exists(e))
-                        items.Add(new { name = Path.GetFileName(e), type = "dir", size = "" });
+                        dirs.Add(new { name = Path.GetFileName(e), type = "dir", size = "", mtime = SafeMtime(e) });
                     else
                     {
                         var fi = new FileInfo(e);
-                        items.Add(new { name = fi.Name, type = "file", size = $"{fi.Length / 1024} KB" });
+                        files.Add(new
+                        {
+                            name = fi.Name,
+                            type = "file",
+                            size = FormatSize(fi.Length),
+                            mtime = SafeMtime(e)
+                        });
                     }
                 }
                 catch { }
             }
-            return new { ok = true, path = dir, items };
+            // Папки первыми, всё по алфавиту — как в обычном проводнике.
+            Comparison<object> byName = (a, b) => string.Compare(
+                ((dynamic)a).name, ((dynamic)b).name, StringComparison.OrdinalIgnoreCase);
+            dirs.Sort(byName);
+            files.Sort(byName);
+            var items = dirs.Concat(files).Take(200).ToList<object>();
+            return new { ok = true, path = full, parent, items };
         }
         catch (Exception ex) { return Fail(Trim(ex.Message, 160)); }
+    }
+
+    private static string SafeMtime(string path)
+    {
+        try { return new FileInfo(path).LastWriteTime.ToString("g"); }
+        catch { return ""; }
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1_073_741_824 => $"{bytes / 1073741824.0:F1} GB",
+        >= 1_048_576 => $"{bytes / 1048576.0:F1} MB",
+        >= 1024 => $"{bytes / 1024.0:F0} KB",
+        _ => $"{bytes} B"
+    };
+
+    private static object ListDrives()
+    {
+        try
+        {
+            var items = new List<object>();
+            foreach (var d in DriveInfo.GetDrives().Where(d => d.IsReady))
+            {
+                try
+                {
+                    items.Add(new
+                    {
+                        name = d.Name,
+                        type = "drive",
+                        size = $"{d.AvailableFreeSpace / 1073741824.0:F1}/{d.TotalSize / 1073741824.0:F0} GB free",
+                        label = string.IsNullOrWhiteSpace(d.VolumeLabel) ? d.DriveType.ToString() : d.VolumeLabel
+                    });
+                }
+                catch { }
+            }
+            return new { ok = true, message = $"Drives: {items.Count}", output = string.Join("\n", items.Cast<dynamic>().Select(x => $"{x.name} {(string)x.label}")), items };
+        }
+        catch (Exception ex) { return Fail(Trim(ex.Message, 160)); }
+    }
+
+    // ── Запись из WebApp (удаление/создание/загрузка): что запрещено ──
+    // Читать можно много, а писать/стирать — только в безопасных местах:
+    // + BlockedForRemoteRead (папка SystemGuard, Windows, чужие профили),
+    // + корни дисков, Windows, Program Files, ProgramData, корень Users
+    //   и корень собственного профиля (стереть профиль целиком — не надо).
+    private static string? BlockedForWrite(string? path, bool isDir)
+    {
+        var readBlock = SelfProtection.BlockedForRemoteRead(path);
+        if (readBlock != null) return readBlock;
+        string full;
+        try { full = Path.GetFullPath(path!).TrimEnd(Path.DirectorySeparatorChar); }
+        catch { return "Bad path"; }
+        try
+        {
+            if (isDir)
+            {
+                var root = Path.GetPathRoot(full)?.TrimEnd(Path.DirectorySeparatorChar) ?? "";
+                if (full.Equals(root, StringComparison.OrdinalIgnoreCase))
+                    return "Drive root is protected";
+                string win = "";
+                try { win = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.Windows)).TrimEnd(Path.DirectorySeparatorChar); } catch { }
+                if (!string.IsNullOrEmpty(win) &&
+                    (full.Equals(win, StringComparison.OrdinalIgnoreCase) ||
+                     full.StartsWith(win + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
+                    return "Windows folder is protected";
+                foreach (var sp in new[] { Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.CommonApplicationData })
+                {
+                    try
+                    {
+                        var p = Path.GetFullPath(Environment.GetFolderPath(sp)).TrimEnd(Path.DirectorySeparatorChar);
+                        if (!string.IsNullOrEmpty(p) &&
+                            (full.Equals(p, StringComparison.OrdinalIgnoreCase) ||
+                             full.StartsWith(p + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
+                            return "System folder is protected";
+                    }
+                    catch { }
+                }
+                try
+                {
+                    var usersRoot = Path.GetFullPath(Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "..")).TrimEnd(Path.DirectorySeparatorChar);
+                    var ownProfile = Path.GetFullPath(
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)).TrimEnd(Path.DirectorySeparatorChar);
+                    if (full.Equals(usersRoot, StringComparison.OrdinalIgnoreCase) ||
+                        full.Equals(ownProfile, StringComparison.OrdinalIgnoreCase))
+                        return "Profile root is protected";
+                }
+                catch { }
+            }
+        }
+        catch { return "Bad path"; }
+        return null;
+    }
+
+    private static object DeleteRemotePath(string path)
+    {
+        try
+        {
+            path = (path ?? "").Trim().Trim('"');
+            if (string.IsNullOrWhiteSpace(path)) return Fail("Enter path to delete");
+            string full;
+            try { full = Path.GetFullPath(path); }
+            catch { return Fail("Bad path"); }
+            bool isDir = Directory.Exists(full);
+            bool isFile = !isDir && File.Exists(full);
+            if (!isDir && !isFile) return Fail("Not found");
+            var blocked = BlockedForWrite(full, isDir);
+            if (blocked != null) return Fail(blocked);
+            bool gone;
+            if (isDir)
+            {
+                // Пустую — сразу, с файлами — рекурсивно (подтверждение уже
+                // спросил клиент; сервер — последняя страховка выше).
+                gone = SelfProtection.SafeDeleteDirectory(full, recursive: true);
+            }
+            else
+            {
+                gone = SelfProtection.SafeDeleteFile(full);
+            }
+            return gone ? Ok((isDir ? "Folder deleted: " : "File deleted: ") + full)
+                        : Fail("Delete refused");
+        }
+        catch (Exception ex) { return Fail(Trim(ex.Message, 160)); }
+    }
+
+    private static object MakeRemoteDir(string path)
+    {
+        try
+        {
+            path = (path ?? "").Trim().Trim('"');
+            if (string.IsNullOrWhiteSpace(path)) return Fail("Enter folder path");
+            string full;
+            try { full = Path.GetFullPath(path); }
+            catch { return Fail("Bad path"); }
+            if (Directory.Exists(full)) return Fail("Already exists");
+            if (File.Exists(full)) return Fail("A file with this name exists");
+            var parent = Path.GetDirectoryName(full.TrimEnd(Path.DirectorySeparatorChar));
+            if (string.IsNullOrEmpty(parent) || !Directory.Exists(parent))
+                return Fail("Parent folder not found");
+            var blocked = BlockedForWrite(full, isDir: false) ?? BlockedForWrite(parent, isDir: true);
+            if (blocked != null) return Fail(blocked);
+            Directory.CreateDirectory(full);
+            return Ok("Folder created: " + full);
+        }
+        catch (Exception ex) { return Fail(Trim(ex.Message, 160)); }
+    }
+
+    /// <summary>
+    /// Ядро загрузки файла с телефона на ПК (тестируемо без HTTP):
+    /// сохраняет bytes как dir\fileName. Возвращает (ok, message, savedPath).
+    /// Имя чистим от путей, при коллизии добавляем (1), (2)…
+    /// </summary>
+    public static (bool Ok, string Message, string? SavedPath) SaveUploadFile(string? dir, string? fileName, byte[]? data, long maxBytes = 250L * 1024 * 1024)
+    {
+        try
+        {
+            if (data == null || data.Length == 0) return (false, "Empty file", null);
+            if (data.Length > maxBytes) return (false, $"File over {maxBytes / 1048576} MB", null);
+            var d = (dir ?? "").Trim().Trim('"');
+            if (string.IsNullOrWhiteSpace(d))
+                d = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string fullDir;
+            try { fullDir = Path.GetFullPath(d); }
+            catch { return (false, "Bad folder", null); }
+            if (!Directory.Exists(fullDir)) return (false, "Folder not found", null);
+            var blocked = BlockedForWrite(fullDir, isDir: true);
+            if (blocked != null) return (false, blocked, null);
+            var clean = (fileName ?? "").Trim().Trim('"');
+            // Только имя файла: срезаем любые пути (../, C:\, /).
+            clean = clean.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+            clean = Path.GetFileName(clean);
+            foreach (var c in Path.GetInvalidFileNameChars()) clean = clean.Replace(c, '_');
+            if (string.IsNullOrWhiteSpace(clean)) return (false, "Bad file name", null);
+            if (clean.Length > 128) clean = clean[..128];
+            var target = Path.Combine(fullDir, clean);
+            // Коллизии: photo.jpg → photo (1).jpg
+            if (File.Exists(target))
+            {
+                var stem = Path.GetFileNameWithoutExtension(clean);
+                var ext = Path.GetExtension(clean);
+                for (int i = 1; i < 1000; i++)
+                {
+                    var cand = Path.Combine(fullDir, $"{stem} ({i}){ext}");
+                    if (!File.Exists(cand)) { target = cand; break; }
+                }
+                if (File.Exists(target)) return (false, "Too many copies", null);
+            }
+            File.WriteAllBytes(target, data);
+            return (true, $"Saved: {Path.GetFileName(target)} ({FormatSize(data.Length)})", target);
+        }
+        catch (Exception ex) { return (false, Trim(ex.Message, 160), null); }
     }
 
     private static string GetBatteryLine()

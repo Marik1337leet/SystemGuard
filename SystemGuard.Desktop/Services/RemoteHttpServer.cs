@@ -12,10 +12,16 @@ namespace SystemGuard.Desktop.Services;
 
 // Локальный HTTP API для WebApp live-режима:
 //   GET  /api/status          — RAM/диски/батарея/громкость JSON
-//   GET  /api/shot.jpg?w=&q=  — скриншот
-//   GET  /api/cam.jpg         — кадр вебкамеры (кэш 4с)
-//   GET  /api/mjpeg?fps=&q=   — живой MJPEG-поток экрана
-//   GET  /api/file?path=      — скачать файл с ПК (до 50 МБ)
+//   GET  /api/shot.jpg?w=&q=  — скриншот (w до 1920, q до 95)
+//   GET  /api/cam.jpg?w=&q=   — кадр вебкамеры (кэш 4с)
+//   GET  /api/mjpeg?fps=&q=&w= — живой MJPEG-поток экрана (до 60 FPS)
+//   GET  /api/cammjpeg?fps=&q=&w= — живой MJPEG-поток камеры
+//   GET  /api/stop?kind=      — мгновенно остановить стримы
+//   GET  /api/policy?kind=    — тексты политик
+//   GET  /api/file?path=      — скачать файл с ПК (до 500 МБ)
+//   POST /api/upload?dir=&name= — залить файл с телефона на ПК (до 250 МБ,
+//                                тело — сырые байты, Content-Type любой:
+//                                клиент шлёт text/plain чтобы не было CORS-preflight)
 //   POST /api/action          — {action, arg} -> команда (как в боте)
 // Авторизация: ?token= (токен генерируется один раз, хранится локально).
 // Слушаем localhost всегда; LAN (http://*:8899) — если хватило прав/резервации.
@@ -164,7 +170,8 @@ public sealed class RemoteHttpServer : IDisposable
                     break;
                 case "/api/shot.jpg":
                 {
-                    int w = QInt(req, "w", 1280), q = QInt(req, "q", 60);
+                    int w = Math.Clamp(QInt(req, "w", 1280), 320, 1920);
+                    int q = Math.Clamp(QInt(req, "q", 60), 30, 95);
                     var jpg = await ScreenCaptureService.CaptureScreenJpegAsync(w, q).ConfigureAwait(false);
                     if (jpg == null) { await WriteJson(res, new { ok = false, error = "Capture failed" }, 500).ConfigureAwait(false); break; }
                     await WriteBytes(res, jpg, "image/jpeg").ConfigureAwait(false);
@@ -172,7 +179,9 @@ public sealed class RemoteHttpServer : IDisposable
                 }
                 case "/api/cam.jpg":
                 {
-                    var (jpg, err) = await RemoteActions.GetCamJpegAsync().ConfigureAwait(false);
+                    int w = Math.Clamp(QInt(req, "w", 960), 320, 1280);
+                    int q = Math.Clamp(QInt(req, "q", 70), 30, 95);
+                    var (jpg, err) = await RemoteActions.GetCamJpegAsync(w, q).ConfigureAwait(false);
                     if (jpg == null) { await WriteJson(res, new { ok = false, error = err }, 503).ConfigureAwait(false); break; }
                     await WriteBytes(res, jpg, "image/jpeg").ConfigureAwait(false);
                     break;
@@ -180,7 +189,7 @@ public sealed class RemoteHttpServer : IDisposable
                 case "/api/mjpeg":
                 {
                     int fps = Math.Clamp(QInt(req, "fps", 30), 1, 60);
-                    int q2 = Math.Clamp(QInt(req, "q", 60), 30, 90);
+                    int q2 = Math.Clamp(QInt(req, "q", 60), 30, 95);
                     int w = Math.Clamp(QInt(req, "w", 1280), 320, 1920);
                     var stream = TakeStreamToken(false);
                     try { await ServeMjpegAsync(res, fps, q2, w, false, stream.Token).ConfigureAwait(false); }
@@ -190,9 +199,10 @@ public sealed class RemoteHttpServer : IDisposable
                 case "/api/cammjpeg":
                 {
                     int fps = Math.Clamp(QInt(req, "fps", 30), 1, 60);
-                    int q2 = Math.Clamp(QInt(req, "q", 65), 30, 90);
+                    int q2 = Math.Clamp(QInt(req, "q", 70), 30, 95);
+                    int w = Math.Clamp(QInt(req, "w", 640), 320, 1280);
                     var stream = TakeStreamToken(true);
-                    try { await ServeMjpegAsync(res, fps, q2, 0, true, stream.Token).ConfigureAwait(false); }
+                    try { await ServeMjpegAsync(res, fps, q2, w, true, stream.Token).ConfigureAwait(false); }
                     finally { DropStreamToken(true, stream); }
                     break;
                 }
@@ -230,6 +240,24 @@ public sealed class RemoteHttpServer : IDisposable
                     await using (var fs = File.Open(p, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                         await fs.CopyToAsync(res.OutputStream).ConfigureAwait(false);
                     res.Close();
+                    break;
+                }
+                case "/api/upload":
+                {
+                    // Заливка с телефона на ПК в выбранную папку (проводник WebApp).
+                    // POST, тело — сырые байты файла (Content-Type: text/plain,
+                    // чтобы мобильные WebView не слали CORS-preflight).
+                    if (req.HttpMethod != "POST") { await WriteJson(res, new { ok = false, error = "POST only" }, 405).ConfigureAwait(false); break; }
+                    var dir = (req.QueryString["dir"] ?? "").Trim().Trim('"');
+                    var name = (req.QueryString["name"] ?? "").Trim().Trim('"');
+                    const long maxBytes = 250L * 1024 * 1024;
+                    byte[] data;
+                    try { data = await ReadCappedAsync(req.InputStream, maxBytes + 1).ConfigureAwait(false); }
+                    catch { await WriteJson(res, new { ok = false, error = "Read failed" }, 400).ConfigureAwait(false); break; }
+                    var (ok, msg, saved) = RemoteActions.SaveUploadFile(dir, name, data, maxBytes);
+                    await WriteJson(res, ok ? new { ok = true, message = msg, saved }
+                                            : new { ok = false, error = msg },
+                                            ok ? 200 : 400).ConfigureAwait(false);
                     break;
                 }
                 case "/api/action":
@@ -321,13 +349,14 @@ public sealed class RemoteHttpServer : IDisposable
                 byte[]? jpg;
                 if (cam)
                 {
+                    int cw = width > 0 ? width : 640;
                     if (camSession)
                     {
-                        jpg = WebcamService.TryGetStreamFrame(640);
+                        jpg = WebcamService.TryGetStreamFrame(cw, quality);
                     }
                     else
                     {
-                        var (frame, _) = await RemoteActions.GetCamJpegFreshAsync().ConfigureAwait(false);
+                        var (frame, _) = await RemoteActions.GetCamJpegFreshAsync(cw).ConfigureAwait(false);
                         jpg = frame;
                     }
                 }
@@ -361,6 +390,22 @@ public sealed class RemoteHttpServer : IDisposable
     private static int QInt(HttpListenerRequest req, string key, int def)
     {
         return int.TryParse(req.QueryString[key], out var v) ? v : def;
+    }
+
+    /// <summary>Читает тело запроса с жёстким потолком (защита от OOM на /api/upload).</summary>
+    private static async Task<byte[]> ReadCappedAsync(Stream src, long maxBytes)
+    {
+        using var ms = new MemoryStream();
+        var buf = new byte[128 * 1024];
+        long total = 0;
+        int n;
+        while ((n = await src.ReadAsync(buf).ConfigureAwait(false)) > 0)
+        {
+            total += n;
+            if (total > maxBytes) throw new InvalidOperationException("Body too large");
+            ms.Write(buf, 0, n);
+        }
+        return ms.ToArray();
     }
 
     private static async Task WriteJson(HttpListenerResponse res, object obj, int status = 200)

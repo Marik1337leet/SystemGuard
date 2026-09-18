@@ -112,6 +112,7 @@
                 <Panel Width="528" Height="36" ClipToBounds="True">
                     <Border x:Name="TabIndicator" Width="132" Height="36" CornerRadius="18"
                             Background="{DynamicResource AccentBrush}"
+                            Margin="{Binding SelectedSection, Converter={StaticResource SectionToTabMarginConverter}, ConverterParameter='Cleanup|Tools|Privacy|Uninstall'}"
                             HorizontalAlignment="Left" VerticalAlignment="Center">
                         <Border.Transitions>
                             <Transitions>

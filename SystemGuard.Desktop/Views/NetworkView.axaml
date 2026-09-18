@@ -66,6 +66,7 @@
                             <Panel Width="396" Height="36" ClipToBounds="True">
                                 <Border x:Name="TabIndicator" Width="132" Height="36" CornerRadius="18"
                                         Background="{DynamicResource AccentBrush}"
+                                        Margin="{Binding SelectedTab, Converter={StaticResource SectionToTabMarginConverter}, ConverterParameter='Adapters|Firewall|Tools'}"
                                         HorizontalAlignment="Left" VerticalAlignment="Center">
                                     <Border.Transitions>
                                         <Transitions>

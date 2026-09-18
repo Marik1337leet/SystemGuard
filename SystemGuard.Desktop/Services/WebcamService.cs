@@ -17,23 +17,23 @@ public static class WebcamService
     private static readonly SemaphoreSlim _gate = new(1, 1);
 
     public static async Task<(byte[]? Jpeg, string Error)> CaptureJpegAsync(
-        int maxWidth = 960, CancellationToken ct = default)
+        int maxWidth = 960, int quality = 70, CancellationToken ct = default)
     {
         // Если идёт стрим — отдаём свежайший кадр сессии (мгновенно,
         // без второго открытия устройства, иначе "busy").
-        var live = TryGetStreamFrame(maxWidth);
+        var live = TryGetStreamFrame(maxWidth, quality);
         if (live != null) return (live, "");
         // Камеру не дёргаем параллельно (бот + HTTP): железо одно
         if (!await _gate.WaitAsync(TimeSpan.FromSeconds(20), ct).ConfigureAwait(false))
             return (null, "Camera is busy, try again");
         try
         {
-            return await Task.Run(() => CaptureOnce(maxWidth, ct), ct).ConfigureAwait(false);
+            return await Task.Run(() => CaptureOnce(maxWidth, quality, ct), ct).ConfigureAwait(false);
         }
         finally { _gate.Release(); }
     }
 
-    private static (byte[]?, string) CaptureOnce(int maxWidth, CancellationToken ct)
+    private static (byte[]?, string) CaptureOnce(int maxWidth, int quality, CancellationToken ct)
     {
         try
         {
@@ -48,7 +48,7 @@ public static class WebcamService
             if (image == null || image.Length < 100)
                 return (null, "Camera returned an empty frame (busy in another app?)");
 
-            var jpeg = ToJpeg(image, maxWidth);
+            var jpeg = ToJpeg(image, maxWidth, quality);
             return jpeg == null
                 ? (null, "Could not decode camera frame")
                 : (jpeg, "");
@@ -192,12 +192,12 @@ public static class WebcamService
     }
 
     /// <summary>Свежайший кадр сессии (уже JPEG, ужатый). Null — кадра пока нет.</summary>
-    public static byte[]? TryGetStreamFrame(int maxWidth = 640)
+    public static byte[]? TryGetStreamFrame(int maxWidth = 640, int quality = 70)
     {
         byte[]? raw;
         lock (_sessionLock) raw = _sessionRaw;
         if (raw == null || raw.Length < 100) return null;
-        return ToJpeg(raw, maxWidth);
+        return ToJpeg(raw, maxWidth, quality);
     }
 
     private static bool IsJpeg(VideoCharacteristics c)
@@ -211,10 +211,11 @@ public static class WebcamService
     }
 
     // Кадр может быть JPEG, PNG или DIB — приводим всё к компактному JPEG
-    private static byte[]? ToJpeg(byte[] image, int maxWidth)
+    private static byte[]? ToJpeg(byte[] image, int maxWidth, int quality = 70)
     {
         try
         {
+            quality = Math.Clamp(quality, 30, 95);
             if (image.Length > 2 && image[0] == 0xFF && image[1] == 0xD8 && maxWidth >= 1280)
                 return image; // уже JPEG и небольшой — отдаём как есть
             using var ms = new MemoryStream(image);
@@ -229,7 +230,7 @@ public static class WebcamService
                 }
                 var enc = ImageCodecInfo.GetImageEncoders().First(c => c.MimeType == "image/jpeg");
                 var prm = new EncoderParameters(1);
-                prm.Param[0] = new EncoderParameter(Encoder.Quality, 70L);
+                prm.Param[0] = new EncoderParameter(Encoder.Quality, (long)quality);
                 using var out1 = new MemoryStream();
                 work.Save(out1, enc, prm);
                 return out1.ToArray();

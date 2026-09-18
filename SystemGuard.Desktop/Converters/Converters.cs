@@ -125,6 +125,31 @@ public class TabBrushConverter : IMultiValueConverter
     }
 }
 
+// ── Selected section/tab name → Margin капли-индикатора ───────────────────
+// Капля фиксированной ширины 132px: позиция = индекс имени в списке из
+// ConverterParameter ("General|Colors|Telegram|License") * 132.
+// Привязка Margin к секции VM вместо движения из code-behind по клику:
+// View пересоздаётся при каждой навигации (DataTemplate), а VM переиспользуется,
+// поэтому двигать каплю только в Click-хендлере = рассинхрон (контент помнит таб,
+// а капля сбрасывается на 0). С биндингом капля всегда на запомненном табе,
+// включая программные переходы (напр. бейдж лицензии → SelectLicenseTab).
+public class SectionToTabMarginConverter : IValueConverter
+{
+    private const double SegmentWidth = 132;
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var current = value as string ?? "";
+        var tabs = (parameter as string ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries);
+        var index = Array.IndexOf(tabs, current);
+        if (index < 0) index = 0;
+        return new Thickness(index * SegmentWidth, 0, 0, 0);
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 // ── string → bool (непустая строка) ─────────────────────────────────────────
 public class StringNotEmptyConverter : IValueConverter
 {

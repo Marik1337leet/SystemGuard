@@ -116,7 +116,7 @@ public static class ScreenCaptureService
             }
             var enc = ImageCodecInfo.GetImageEncoders().First(c => c.MimeType == "image/jpeg");
             var prm = new EncoderParameters(1);
-            prm.Param[0] = new EncoderParameter(Encoder.Quality, Math.Clamp(quality, 30, 90));
+            prm.Param[0] = new EncoderParameter(Encoder.Quality, Math.Clamp(quality, 30, 95));
             using var ms = new MemoryStream();
             work.Save(ms, enc, prm);
             return ms.ToArray();

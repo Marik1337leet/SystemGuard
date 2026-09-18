@@ -1,4 +1,3 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using SystemGuard.Desktop.ViewModels;
@@ -7,25 +6,20 @@ namespace SystemGuard.Desktop.Views;
 
 public partial class SettingsView : UserControl
 {
-    // Капля 132px: General / Colors / Telegram / License → 0 / 132 / 264 / 396.
+    // Капля 132px едет сама: Margin TabIndicator привязан в XAML к
+    // SelectedSection через SectionToTabMarginConverter (General / Colors / Telegram / License).
+    // Так капля всегда на запомненном табе: View пересоздаётся при навигации,
+    // а VM переиспользуется. Клик только переключает таб в VM.
     public SettingsView() => InitializeComponent();
 
-    private void MoveDroplet(int index)
+    private void SelectTab(string tab)
     {
-        var indicator = this.FindControl<Border>("TabIndicator");
-        if (indicator != null)
-            indicator.Margin = new Thickness(index * 132, 0, 0, 0);
-    }
-
-    private void SelectTab(string tab, int index)
-    {
-        MoveDroplet(index);
         if (DataContext is SettingsViewModel vm && vm.SelectTabCommand.CanExecute(tab))
             vm.SelectTabCommand.Execute(tab);
     }
 
-    private void GeneralTab_Click(object? sender, RoutedEventArgs e) => SelectTab("General", 0);
-    private void ColorsTab_Click(object? sender, RoutedEventArgs e) => SelectTab("Colors", 1);
-    private void TelegramTab_Click(object? sender, RoutedEventArgs e) => SelectTab("Telegram", 2);
-    private void LicenseTab_Click(object? sender, RoutedEventArgs e) => SelectTab("License", 3);
+    private void GeneralTab_Click(object? sender, RoutedEventArgs e) => SelectTab("General");
+    private void ColorsTab_Click(object? sender, RoutedEventArgs e) => SelectTab("Colors");
+    private void TelegramTab_Click(object? sender, RoutedEventArgs e) => SelectTab("Telegram");
+    private void LicenseTab_Click(object? sender, RoutedEventArgs e) => SelectTab("License");
 }

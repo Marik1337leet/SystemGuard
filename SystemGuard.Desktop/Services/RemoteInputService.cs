@@ -137,6 +137,18 @@ public static class RemoteInputService
 
     private static string? DenyMouseIfOff() => MouseEnabled ? null : MouseOffMessage;
 
+    /// <summary>
+    /// Свич управления клавиатурой из WebApp (вкладка Пульт, мастер-свич ввода).
+    /// Выключен — key/type отклоняются. Ввод пароля (unlock) НЕ гейтится:
+    /// это отдельный сценарий с подтверждением, а не свободная печать.
+    /// По умолчанию включён (прежнее поведение).
+    /// </summary>
+    public static bool KeyboardEnabled { get; set; } = true;
+
+    public const string KbdOffMessage = "Keyboard control is off — включите ввод в WebApp";
+
+    private static string? DenyKbdIfOff() => KeyboardEnabled ? null : KbdOffMessage;
+
     // Относительное движение (тачпад в WebApp): dx,dy в пикселях.
     public static string MoveRelative(int dx, int dy)
     {
@@ -236,6 +248,8 @@ public static class RemoteInputService
     // ctrl+c/v/x/z/a/s, win+d, win+l, win+r, printscreen.
     public static string PressKey(string name)
     {
+        var deny = DenyKbdIfOff();
+        if (deny != null) return deny;
         try
         {
             var k = (name ?? "").Trim().ToLowerInvariant().Replace(" ", "").Replace("_", "");
@@ -311,6 +325,8 @@ public static class RemoteInputService
     // Печать текста юникодом (кириллица — можно). Лимит 500 символов за раз.
     public static async Task<string> TypeTextAsync(string text)
     {
+        var deny = DenyKbdIfOff();
+        if (deny != null) return deny;
         if (string.IsNullOrEmpty(text)) return "Empty text";
         if (text.Length > 500) text = text[..500];
         return await Task.Run(() =>
