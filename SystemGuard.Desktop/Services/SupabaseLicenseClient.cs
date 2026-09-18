@@ -88,4 +88,117 @@ public static class SupabaseLicenseClient
         }
         catch { return ("", ""); }
     }
+
+    // ── Отчёт об активации: какой ПК (hwid + имя) каким ключом пользуется ──
+    // Приложение пишет строку в public.activations при активации ключа
+    // (force: true) и раз в сутки при живой Pro (force: false, троттлинг
+    // файлом cloud_report.txt). Полного ключа наружу нет — только key_prefix.
+    // Без supabase.json — тихо ничего не делает. Возвращает true если
+    // строка реально ушла в облако.
+
+    /// <summary>
+    /// Строит тело для activations. Null — отчитываться не о чем
+    /// (пустой hwid/ключ, мусорный формат). Тестируемо без сети.
+    /// </summary>
+    public static object? BuildActivationPayload(string? hwid, string? machine, string? key, string? tier, string? plan, string? appVersion)
+    {
+        try
+        {
+            hwid = (hwid ?? "").Trim().ToLower();
+            if (hwid.Length != 32 || !hwid.All(c => Uri.IsHexDigit(c))) return null;
+            key = (key ?? "").Trim();
+            if (!(key.StartsWith("SG-PRO-", StringComparison.OrdinalIgnoreCase) ||
+                  key.StartsWith("SG-ENT-", StringComparison.OrdinalIgnoreCase)) || key.Length < 32)
+                return null;
+            return new
+            {
+                hwid,
+                machine = (machine ?? "").Trim()[..Math.Min(64, (machine ?? "").Trim().Length)],
+                key_prefix = KeyPrefix(key),
+                tier = (tier ?? "").Trim(),
+                plan = (plan ?? "").Trim(),
+                app_version = (appVersion ?? "").Trim()
+            };
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Префикс ключа для БД: первые 28 символов. Короче нельзя: все Pro-ключи
+    /// начинаются одинаково (base64 от "Pro|..."), а 28 уже цепляют дату+тариф
+    /// и различают ключи. Старые строки с коротким префиксом матчатся
+    /// через LIKE 'prefix%'.
+    /// </summary>
+    public static string KeyPrefix(string key)
+    {
+        key = (key ?? "").Trim();
+        return key[..Math.Min(28, key.Length)];
+    }
+
+    public static void ReportActivation(string? hwid, string? machine, string? key, string? tier, string? plan, bool force = false)
+    {
+        // Fire-and-forget: отчёт никогда не должен мешать активации.
+        try { _ = ReportActivationAsync(hwid, machine, key, tier, plan, force); }
+        catch { }
+    }
+
+    public static async Task<bool> ReportActivationAsync(string? hwid, string? machine, string? key, string? tier, string? plan, bool force = false)
+    {
+        try
+        {
+            var payload = BuildActivationPayload(hwid, machine, key, tier, plan, AppVersionShort());
+            if (payload == null) return false;
+            var (url, anon) = ReadConfig();
+            if (string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(anon)) return false;
+            if (!force && ReportedToday()) return false;
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, url.TrimEnd('/') + "/rest/v1/activations");
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", anon);
+            req.Headers.Add("apikey", anon);
+            req.Content = new StringContent(
+                JsonSerializer.Serialize(payload),
+                System.Text.Encoding.UTF8, "application/json");
+            using var res = await _http.SendAsync(req).ConfigureAwait(false);
+            if (!res.IsSuccessStatusCode) return false;
+            MarkReportedToday();
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private static string AppVersionShort()
+    {
+        try
+        {
+            var v = typeof(SupabaseLicenseClient).Assembly.GetName().Version;
+            return v != null ? $"{v.Major}.{v.Minor}.{v.Build}" : "";
+        }
+        catch { return ""; }
+    }
+
+    private static string ReportStampPath() => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "SystemGuard", "cloud_report.txt");
+
+    private static bool ReportedToday()
+    {
+        try
+        {
+            var p = ReportStampPath();
+            if (!File.Exists(p)) return false;
+            return File.ReadAllText(p).Trim() == DateTime.UtcNow.ToString("yyyy-MM-dd");
+        }
+        catch { return false; }
+    }
+
+    private static void MarkReportedToday()
+    {
+        try
+        {
+            var p = ReportStampPath();
+            Directory.CreateDirectory(Path.GetDirectoryName(p)!);
+            File.WriteAllText(p, DateTime.UtcNow.ToString("yyyy-MM-dd"));
+        }
+        catch { }
+    }
 }

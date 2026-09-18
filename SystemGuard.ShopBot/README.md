@@ -56,6 +56,15 @@ dotnet run --project SystemGuard.ShopBot
 - Таблица `licenses`: продлить — `expires_at`, забанить — `revoked = true`,
   мульти-ПК (Enterprise) — несколько строк с разными `hwid` на один `telegram_id`.
 - Таблица `customers` — кто есть кто. `payments` — аудит оплат.
+- Таблица `activations` — **какой ПК каким ключом пользуется**: приложение само пишет
+  строку при активации и раз в сутки при живой Pro (нужен `supabase.json` на ПК,
+  anon-ключ умеет только вставлять строки, читать их может только владелец).
+  Кто где сидит:
+  `select distinct on (key_prefix, hwid) key_prefix, hwid, machine, tier, plan, app_version, created_at as last_seen from public.activations order by key_prefix, hwid, created_at desc;`
+- Складские ключи без пользователей: генерируешь KeyGenerator'ом (переносимые),
+  вставляешь через `seed_stock_template.sql` (ключи — только свои, в репозиторий
+  их не коммитить), раздаёшь сам; когда ключ забрали — проставляешь строке
+  `telegram_id/username/hwid`. Активацию на ПК увидишь в `activations` по `key_prefix`.
 - Позже к тем же таблицам подключается сайт/админка — схема уже готова.
 - Stars выводятся: BotFather → My Bots → Payments → Fragment (чек дублируется тебе в личку).
 

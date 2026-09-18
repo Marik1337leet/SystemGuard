@@ -182,6 +182,8 @@ public class LicenseService
                     IsValid = true
                 };
                 SaveLicense();
+                // Владелец видит в БД, какой ПК каким ключом пользуется.
+                SupabaseLicenseClient.ReportActivation(_machineId, Environment.MachineName, key, "Pro", result.Plan, force: true);
                 return (true, $"Pro {result.Plan} activated! Valid until {result.ExpiresAt:dd MMM yyyy}");
             }
             return (false, result.Error);
@@ -205,6 +207,7 @@ public class LicenseService
                     IsValid = true
                 };
                 SaveLicense();
+                SupabaseLicenseClient.ReportActivation(_machineId, Environment.MachineName, key, "Enterprise", result.Plan, force: true);
                 return (true, $"Enterprise {result.Plan} activated! Valid until {result.ExpiresAt:dd MMM yyyy}");
             }
             return (false, result.Error);
@@ -391,6 +394,10 @@ public class LicenseService
                 license.LastSeenUtc = now;
                 CurrentLicense = license;
                 try { SaveLicense(); } catch { }
+                // Живая Pro/Enterprise раз в сутки маякует в БД (троттлинг внутри):
+                // владелец видит, что ПК с ключом ещё в строю.
+                if (license.Tier is "Pro" or "Enterprise" && !string.IsNullOrWhiteSpace(license.Key))
+                    SupabaseLicenseClient.ReportActivation(_machineId, Environment.MachineName, license.Key, license.Tier, license.Plan, force: false);
             }
             else
             {

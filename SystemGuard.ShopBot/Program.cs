@@ -281,7 +281,7 @@ static class Delivery
                 Username: username,
                 Hwid: hwid,
                 Tier: "Pro", Plan: plan,
-                ExpiresAt: exp, KeyPrefix: key[..12],
+                ExpiresAt: exp, KeyPrefix: key[..Math.Min(28, key.Length)],
                 PaymentRef: paymentRef, CreatedAt: DateTime.UtcNow), ct);
             await bot.SendMessage(chat,
                 $"<b>Оплата прошла. Спасибо!</b>\n\n" +
